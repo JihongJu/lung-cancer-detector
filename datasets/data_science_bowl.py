@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 
 def load_data(trainval='stage1', img_format='dicom',
-              target_size=(512, 512, 128), test_size=0.2):
+              target_size=(512, 512, 256), test_size=0.2):
     """Loads datasets of Data Science Bowl 2017
     # Arguments
         trainval: specify which set of images for train and validation
@@ -54,6 +54,7 @@ def load_data(trainval='stage1', img_format='dicom',
             img = Image(x_series, vox2mni(np.eye(4)))
         # TODO: fix size and Coeregistration / normalization
         # See: http://nipy.org/nipy/devel/code_discussions/usecases/images.html
+        # and http://nipy.bic.berkeley.edu/nightly/nipy/doc/api/generated/nipy.labs.datasets.volumes.volume_img.html#nipy.labs.datasets.volumes.volume_img.VolumeImg
         X[s_id, ...] = np.zeros(target_size)
         print type(img), img.shape
 
