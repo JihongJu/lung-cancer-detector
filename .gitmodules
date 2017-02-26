@@ -1,3 +1,0 @@
-[submodule "keras-resnet"]
-	path = keras-resnet
-	url = git@github.com:raghakot/keras-resnet.git
