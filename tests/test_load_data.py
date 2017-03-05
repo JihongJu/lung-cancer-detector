@@ -40,16 +40,18 @@ def test_vol_loader():
 
 
 def test_data_generator(vol_data_gen, train_vol_loader, test_vol_loader):
+    print('Train')
     train_generator = vol_data_gen.flow_from_loader(
             volume_data_loader=train_vol_loader,
-            batch_size=1)
-    for i in range(8):
+            batch_size=1, shuffle=True, seed=42)
+    for i in range(16):
         batch_x, batch_y = train_generator.next()
         assert batch_x.shape == (1, 512, 512, 128, 1)
+    print('Test')
     test_generator = vol_data_gen.flow_from_loader(
         volume_data_loader=test_vol_loader,
-        batch_size=1)
-    for i in range(2):
+        batch_size=1, shuffle=True, seed=42)
+    for i in range(4):
         batch_x, batch_y = test_generator.next()
         assert batch_x.shape == (1, 512, 512, 128, 1)
-    assert False
+        

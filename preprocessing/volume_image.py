@@ -35,9 +35,7 @@ class VolumeDataGenerator(object):
             self.dim2_axis = 2
             self.dim3_axis = 3
         self.dim_ordering = dim_ordering
-        # mean and std for normalization
-        self.mean = None
-        self.std = None
+
 
     def flow_from_loader(self, volume_data_loader,
                          batch_size=1, shuffle=True, seed=None):
@@ -71,6 +69,10 @@ class VolumeLoaderIterator(Iterator):
         self.nb_sample = len(self.filenames)
         self.image_shape = volume_data_loader.image_shape
         self.classes = volume_data_loader.classes
+        # compute mean
+        # mean and rescale (max-min) for normalization
+        self.mean = None
+        self.rescale = 2192.
 
         super(VolumeLoaderIterator, self).__init__(self.nb_sample, batch_size,
                                                    shuffle, seed)
@@ -87,6 +89,7 @@ class VolumeLoaderIterator(Iterator):
             img = self.volume_data_loader.load(fname)
             # augmentation goes here
             x = img_to_array(img)
+            x -= self.mean
             batch_x[i] = x
         batch_y = self.classes[index_array]
 
