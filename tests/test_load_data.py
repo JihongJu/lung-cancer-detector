@@ -1,10 +1,55 @@
 import pytest
-from datasets.data_science_bowl import load_data
+from preprocessing.volume_image import (
+    VolumeDataGenerator,
+    VolumeDataLoader
+)
 
 
-def test_data_science_bowl():
-    trainval = 'sample_images'
+@pytest.fixture
+def vol_data_gen():
+    datagen = VolumeDataGenerator()
+    return datagen
 
-    (X_train, y_train), (X_test, y_test) = load_data(trainval=trainval)
-    print(len(X_train), len(y_train))
-    assert len(X_train) == len(y_train)
+
+@pytest.fixture
+def train_vol_loader():
+    vol_load_args = dict(
+        directory='data/dcm',
+        image_set='sample_images',
+        image_format='dcm',
+        split='train',
+        test_size=0.2,
+        random_state=42,
+        target_size=(512, 512, 128)
+    )
+    return VolumeDataLoader(**vol_load_args)
+
+
+@pytest.fixture
+def test_vol_loader():
+    vol_load_args = dict(
+        directory='data/dcm',
+        image_set='sample_images',
+        image_format='dcm',
+        split='val',
+        test_size=0.2,
+        random_state=42,
+        target_size=(512, 512, 128)
+        )
+    return VolumeDataLoader(**vol_load_args)
+
+
+def test_data_generator(vol_data_gen, train_vol_loader, test_vol_loader):
+    train_generator = vol_data_gen.flow_from_loader(
+            volume_data_loader=train_vol_loader,
+            batch_size=1)
+    for i in range(8):
+        batch_x, batch_y = train_generator.next()
+        assert batch_x.shape == (1, 512, 512, 128, 1)
+    test_generator = vol_data_gen.flow_from_loader(
+        volume_data_loader=test_vol_loader,
+        batch_size=1)
+    for i in range(2):
+        batch_x, batch_y = test_generator.next()
+        assert batch_x.shape == (1, 512, 512, 128, 1)
+    assert False
