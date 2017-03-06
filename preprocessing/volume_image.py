@@ -2,6 +2,7 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import os
 import dicom
+import scipy
 import numpy as np
 import pandas as pd
 import nipy as ni
@@ -13,9 +14,86 @@ from nipy.labs.datasets.volumes.volume_img import VolumeImg
 from sklearn.model_selection import train_test_split
 
 
+def pixelwise_normalize(image, pixel_bounds):
+    if len(pixel_bounds) != 2:
+        raise ValueError("Expected tuple of pixel bounds "
+                         "(min_bound, max_bound). Got {}".format(pixel_bounds))
+    min_bound = pixel_bounds[0]
+    max_bound = pixel_bounds[1]
+    image = (image - min_bound) / (max_bound - min_bound)
+    image[image > 1] = 1.
+    image[image < 0] = 0.
+    return image
+
+
+def img_to_array(img, dim_ordering='default'):
+    """Converts VolumeImg to arr
+        # Arguments
+        img: VolumeImg instance.
+        dim_ordering: Image data format.
+    # Returns
+        A 4D Numpy array.
+    """
+    if dim_ordering == 'default':
+        dim_ordering = K.image_dim_ordering()
+    if dim_ordering not in {'th', 'tf'}:
+        raise ValueError('Unknown dim_ordering: ', dim_ordering)
+    # Numpy array x has format (height, width, channel)
+    # or (channel, height, width)
+    # but original PIL image has format (width, height, channel)
+    if isinstance(img, np.ndarray):
+        x = img.astype(K.floatx())
+    else:
+        x = img.get_data().astype(K.floatx())
+    if len(x.shape) == 4:
+        if dim_ordering == 'th':
+            x = x.transpose(3, 0, 1, 2)
+    elif len(x.shape) == 3:
+        if dim_ordering == 'th':
+            x = x.reshape((1, x.shape[0], x.shape[1], x.shape[2]))
+        else:
+            x = x.reshape((x.shape[0], x.shape[1], x.shape[2], 1))
+    else:
+        raise ValueError('Unsupported image shape: ', x.shape)
+    return x
+
+
+def pad_to_shape(arr, target_size):
+    """Pad arrays such that it has the shape of target_size
+    """
+    arr_shape = arr.shape
+    npad = ()
+    for dim in range(len(arr_shape)):
+        diff = target_size[dim] - arr_shape[dim]
+        before = int(diff / 2)
+        after = diff - before
+        npad += ((before, after),)
+    pad_arr = np.pad(arr, pad_width=npad,
+                     mode='constant',
+                     constant_values=0)
+    return pad_arr
+
+
 class VolumeDataGenerator(object):
 
-    def __init__(self, preprocessing_function=None, dim_ordering='default'):
+    def __init__(self,
+                 pixelwise_center=None,
+                 pixel_mean=None,
+                 pixelwise_normalization=None,
+                 pixel_bounds=None,
+                 preprocessing_function=None, dim_ordering='default'):
+        """
+        # Arguments
+            pixelwise_center: substract pixel mean
+            pixel_mean: dataset_mean (e.g. 0.25 for LUNA2016)
+            pixelwise_normalization: scaled by pixel_bounds
+            pixel_bounds: tuple of pixel bounds (min_bound, max_bound)
+        """
+        self.pixelwise_center = pixelwise_center
+        self.pixel_mean = pixel_mean
+        self.pixelwise_normalization = pixelwise_normalization
+        self.pixel_bounds = pixel_bounds
+        self.preprocessing_function = preprocessing_function
         # image_dim_ordering
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
@@ -36,7 +114,6 @@ class VolumeDataGenerator(object):
             self.dim3_axis = 3
         self.dim_ordering = dim_ordering
 
-
     def flow_from_loader(self, volume_data_loader,
                          batch_size=1, shuffle=True, seed=None):
         return VolumeLoaderIterator(
@@ -49,8 +126,14 @@ class VolumeDataGenerator(object):
     def standardize(self, x):
         """standardize inputs including featurewise/samplewise
         center/normalization, etc."""
-        # if self.preprocessing_function:
-        #     x = self.preprocessing_function(x)
+        if self.preprocessing_function:
+            x = self.preprocessing_function(x)
+        if self.pixelwise_center:
+            if self.pixel_mean is not None:
+                x -= self.pixel_mean
+        if self.pixelwise_normalization:
+            if self.pixel_bounds is not None:
+                x = pixelwise_normalize(x, self.pixel_bounds)
         pass
 
     def random_transform(self, x):
@@ -69,10 +152,6 @@ class VolumeLoaderIterator(Iterator):
         self.nb_sample = len(self.filenames)
         self.image_shape = volume_data_loader.image_shape
         self.classes = volume_data_loader.classes
-        # compute mean
-        # mean and rescale (max-min) for normalization
-        self.mean = None
-        self.rescale = 2192.
 
         super(VolumeLoaderIterator, self).__init__(self.nb_sample, batch_size,
                                                    shuffle, seed)
@@ -86,10 +165,9 @@ class VolumeLoaderIterator(Iterator):
         for i, j in enumerate(index_array):
             fname = self.filenames[j]
             print("Loading {}, {}".format(j, fname))
-            img = self.volume_data_loader.load(fname)
+            x = self.volume_data_loader.load(fname)
             # augmentation goes here
-            x = img_to_array(img)
-            x -= self.mean
+            x = self.volume_data_generator.standardize(x)
             batch_x[i] = x
         batch_y = self.classes[index_array]
 
@@ -99,22 +177,13 @@ class VolumeLoaderIterator(Iterator):
 class VolumeDataLoader(object):
     """ Helper class for loading images
     # Data structure Overview
-    \root
-        \data
-            \dcm
-                \sample_images
-                sample_images_labels.csv
-                \stage1
-                stage1_labels.csv
-            \nii
-                \sample_images
-                sample_images_labels.csv
-                \stage1
-                stage1_labels.csv
+    \directory
+        \${image_set}
+        ${image_set}_labels.csv
     """
     def __init__(self, directory, image_set, image_format='dcm',
                  split='train', test_size=0.2, random_state=42,
-                 target_size=(512, 512, 128), dim_ordering='default',
+                 target_size=(448, 448, 448), dim_ordering='default',
                  save_to_dir=None, save_prefix='', save_format='dcm'):
         self.directory = directory
         self.image_set = image_set
@@ -140,7 +209,7 @@ class VolumeDataLoader(object):
         self.classes = df_labels['cancer'].values.astype('int')
 
         self.image_format = image_format
-        white_list_formats = {'dcm', 'nii'}
+        white_list_formats = {'dcm', 'nii', 'npy'}
         if image_format not in white_list_formats:
             raise ValueError('Invalid image format:', image_format,
                              '; expected "dcm", "nii".')
@@ -178,65 +247,115 @@ class VolumeDataLoader(object):
         self.save_format = save_format
 
     def load(self, fn):
-        """Image series load method.
+        """Image series load method to be overwritten.
         # Arguments
             fn: filename of the image (without extension suffix)
         # Returns
-            arr: numpy array of shape self.target_size
+            arr: 4D numpy array of shape self.target_size with channels
         """
-        # load image
-        if self.image_format == 'nii':
-            img_path = os.path.join(self.image_dir,
-                                    'Axial_{}.nii.gz'.format(fn))
-            if not os.path.exists(img_path):
-                raise IOError('Image {} does not exist.'.format(img_path))
-            img = ni.load_image(img_path)
-        elif self.image_format == 'dcm':
-            img_path = os.path.join(self.image_dir, fn)
-            if not os.path.exists(img_path):
-                raise IOError('Image {} does not exist.'.format(img_path))
-            img_filenames = os.listdir(img_path)
-            nb_slices = len(img_filenames)
-            img = np.zeros((512, 512, nb_slices), dtype='int16')
-            for f_id, filename in enumerate(img_filenames):
-                dc = dicom.read_file(os.path.join(img_path, filename))
-                img[..., f_id] = dc.pixel_array
-        # resample to fix size
-        vol_img = VolumeImg(data=img, affine=np.eye(4),
-                            world_space='')
-        resampled_img = vol_img.as_volume_img(affine=np.eye(4),
-                                              shape=self.target_size)
-
-        return resampled_img
+        pass
 
     def save(self, arr):
         pass
 
 
-def img_to_array(img, dim_ordering='default'):
-    """Converts VolumeImg to arr
-        # Arguments
-        img: VolumeImg instance.
-        dim_ordering: Image data format.
-    # Returns
-        A 4D Numpy array.
+class DCMDataLoader(VolumeDataLoader):
+    """Load dcm volume data using Kaggle kernel by Guido Zuidhof
+    See https://www.kaggle.com/gzuidhof/data-science-bowl-2017/full-preprocessing-tutorial
+    for details
     """
-    if dim_ordering == 'default':
-        dim_ordering = K.image_dim_ordering()
-    if dim_ordering not in {'th', 'tf'}:
-        raise ValueError('Unknown dim_ordering: ', dim_ordering)
-    # Numpy array x has format (height, width, channel)
-    # or (channel, height, width)
-    # but original PIL image has format (width, height, channel)
-    x = img.get_data().astype(K.floatx())
-    if len(x.shape) == 4:
-        if dim_ordering == 'th':
-            x = x.transpose(3, 0, 1, 2)
-    elif len(x.shape) == 3:
-        if dim_ordering == 'th':
-            x = x.reshape((1, x.shape[0], x.shape[1], x.shape[2]))
-        else:
-            x = x.reshape((x.shape[0], x.shape[1], x.shape[2], 1))
-    else:
-        raise ValueError('Unsupported image shape: ', x.shape)
-    return x
+
+    def load(self, fn):
+        img_path = os.path.join(self.directory, fn)
+        patient = load_scan(img_path)
+        patient_pixels = get_pixels_hu(patient)
+        pix_resampled, spacing = resample(patient_pixels, patient, [1, 1, 1])
+        # pad to target_size
+        resampled_img = pad_to_shape(pix_resampled, self.target_size)
+        # todo
+        arr = img_to_array(resampled_img, self.dim_ordering)
+
+        return arr
+
+
+def load_scan(path):
+    slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
+    slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+    try:
+        slice_thickness = np.abs(slices[0].ImagePositionPatient[2]
+                                 - slices[1].ImagePositionPatient[2])
+    except:
+        slice_thickness = np.abs(slices[0].SliceLocation
+                                 - slices[1].SliceLocation)
+    for s in slices:
+        s.SliceThickness = slice_thickness
+
+    return slices
+
+
+def get_pixels_hu(slices):
+    image = np.stack([s.pixel_array for s in slices])
+    # Convert to int16 (from sometimes int16),
+    # should be possible as values should always be low enough (<32k)
+    image = image.astype(np.int16)
+
+    # Set outside-of-scan pixels to 0
+    # The intercept is usually -1024, so air is approximately 0
+    image[image == -2000] = 0
+
+    # Convert to Hounsfield units (HU)
+    for slice_number in range(len(slices)):
+
+        intercept = slices[slice_number].RescaleIntercept
+        slope = slices[slice_number].RescaleSlope
+
+        if slope != 1:
+            image[slice_number] = slope * image[slice_number].astype(
+                np.float64)
+            image[slice_number] = image[slice_number].astype(np.int16)
+        image[slice_number] += np.int16(intercept)
+
+    return np.array(image, dtype=np.int16)
+
+
+def resample(image, scan, new_spacing=[1, 1, 1]):
+    # Determine current pixel spacing
+    spacing = np.array([scan[0].SliceThickness]
+                       + scan[0].PixelSpacing, dtype=np.float32)
+
+    resize_factor = spacing / new_spacing
+    new_real_shape = image.shape * resize_factor
+    new_shape = np.round(new_real_shape)
+    real_resize_factor = new_shape / image.shape
+    new_spacing = spacing / real_resize_factor
+
+    image = scipy.ndimage.interpolation.zoom(image, real_resize_factor,
+                                             mode='nearest')
+
+    return image, new_spacing
+
+
+class NIIDataLoader(VolumeDataLoader):
+
+    def load(self, fn):
+        img_path = os.path.join(self.image_dir,
+                                'Axial_{}.nii.gz'.format(fn))
+        if not os.path.exists(img_path):
+            raise IOError('Image {} does not exist.'.format(img_path))
+        img = ni.load_image(img_path)
+        arr = img_to_array(img, self.dim_ordering)
+
+        return arr
+
+
+class NPYDataLoader(VolumeDataLoader):
+
+    def load(self, fn):
+        img_path = os.path.join(self.image_dir,
+                                '{}.npy'.format(fn))
+        print(img_path)
+        img = np.load(img_path)
+        pad_img = pad_to_shape(img, self.target_size)
+        arr = img_to_array(pad_img, self.dim_ordering)
+
+        return arr

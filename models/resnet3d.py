@@ -212,3 +212,8 @@ class Resnet3DBuilder(object):
     def build_resnet_18(input_shape, num_outputs):
         return Resnet3DBuilder.build(input_shape, num_outputs, basic_block,
                                      [2, 2, 2, 2])
+
+    @staticmethod
+    def build_resnet_34(input_shape, num_outputs):
+        return Resnet3DBuilder.build(input_shape, num_outputs, basic_block,
+                                     [3, 4, 6, 3])
