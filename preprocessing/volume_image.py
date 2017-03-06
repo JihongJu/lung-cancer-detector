@@ -115,9 +115,11 @@ class VolumeDataGenerator(object):
         self.dim_ordering = dim_ordering
 
     def flow_from_loader(self, volume_data_loader,
+                         class_mode='binary',
                          batch_size=1, shuffle=True, seed=None):
         return VolumeLoaderIterator(
             volume_data_loader, self,
+            class_mode=class_mode,
             batch_size=batch_size,
             shuffle=shuffle,
             seed=seed
@@ -144,9 +146,11 @@ class VolumeDataGenerator(object):
 class VolumeLoaderIterator(Iterator):
 
     def __init__(self, volume_data_loader, volume_data_generator,
+                 class_mode='binary',
                  batch_size=1, shuffle=False, seed=None):
         self.volume_data_loader = volume_data_loader
         self.volume_data_generator = volume_data_generator
+        self.class_mode = class_mode
 
         self.filenames = volume_data_loader.filenames
         self.nb_sample = len(self.filenames)
@@ -169,7 +173,15 @@ class VolumeLoaderIterator(Iterator):
             # augmentation goes here
             x = self.volume_data_generator.standardize(x)
             batch_x[i] = x
-        batch_y = self.classes[index_array]
+        # build batch of labels
+        if self.class_mode == 'sparse':
+            batch_y = self.classes[index_array]
+        elif self.class_mode == 'binary':
+            batch_y = self.classes[index_array].astype(K.floatx())
+        elif self.class_mode == 'categorical':
+            batch_y = np.zeros((len(batch_x), self.nb_class), dtype=K.floatx())
+            for i, label in enumerate(self.classes[index_array]):
+                batch_y[i, label] = 1.
 
         return batch_x, batch_y
 
@@ -353,7 +365,6 @@ class NPYDataLoader(VolumeDataLoader):
     def load(self, fn):
         img_path = os.path.join(self.image_dir,
                                 '{}.npy'.format(fn))
-        print(img_path)
         img = np.load(img_path)
         pad_img = pad_to_shape(img, self.target_size)
         arr = img_to_array(pad_img, self.dim_ordering)
