@@ -6,7 +6,6 @@ import scipy
 import numpy as np
 import pandas as pd
 import nipy as ni
-import nibabel as nib
 import keras.backend as K
 from keras.preprocessing.image import Iterator
 from nipy.core.api import Image, vox2mni
@@ -203,7 +202,7 @@ class VolumeLoaderIterator(Iterator):
                            dtype=K.floatx())
         for i, j in enumerate(index_array):
             fname = self.filenames[j]
-            print("Loading {}, {}".format(j, fname))
+            # print("Loading {}, {}".format(j, fname))
             x = self.volume_data_loader.load(fname)
             # augmentation goes here
             x = self.volume_data_generator.standardize(x)

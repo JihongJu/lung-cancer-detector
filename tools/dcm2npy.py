@@ -1,8 +1,10 @@
 import os
 import dicom
 import scipy
+import scipy.ndimage
 import numpy as np
 
+from multiprocessing import Pool, cpu_count
 
 # Load the scans in given folder path
 def load_scan(path):
@@ -68,9 +70,6 @@ def preprocessing(path):
     print("Shape resampling: {} --> {}".format(patient_pixels.shape,
                                                pix_resampled.shape))
     return pix_resampled
-
-
-from multiprocessing import Pool, cpu_count
 
 
 TRAINVAL = 'stage1'

@@ -15,7 +15,7 @@ from models.resnet3d import Resnet3DBuilder
 
 directory = 'data/data-science-bowl/npy'
 image_set = 'sample_images'
-target_size = (224, 224, 112)
+target_size = (224, 224, 224)
 test_size = 0.2
 random_state = 42
 batch_size = 1
@@ -70,12 +70,16 @@ model.compile(loss="binary_crossentropy",
               metrics=['accuracy'])
 model.fit_generator(
     train_datagen.flow_from_loader(
-        volume_data_loader=train_vol_loader, batch_size=batch_size,
+        volume_data_loader=train_vol_loader,
+	class_mode='binary',
+	batch_size=batch_size,
         shuffle=True),
     samples_per_epoch=samples_per_epoch,
     nb_epoch=nb_epoch,
     validation_data=test_datagen.flow_from_loader(
-        volume_data_loader=train_vol_loader, batch_size=batch_size,
+        volume_data_loader=train_vol_loader,
+	batch_size=batch_size,
+	class_mode='binary',
         shuffle=True),
     nb_val_samples=nb_val_samples,
     callbacks=[lr_reducer, early_stopper, csv_logger]

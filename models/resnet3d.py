@@ -24,7 +24,7 @@ def _bn_relu(input):
     """Helper to build a BN -> relu block (copy-paster from
     raghakot/keras-resnet)
     """
-    norm = BatchNormalization(mode=0, axis=CHANNEL_AXIS)(input)
+    norm = BatchNormalization(axis=CHANNEL_AXIS)(input)
     return Activation("relu")(norm)
 
 
@@ -176,7 +176,7 @@ class Resnet3DBuilder(object):
         block_fn = _get_block(block_fn)
         input = Input(shape=input_shape)
         # first conv
-        conv1 = Convolution3D(nb_filter=64, kernel_dim1=7, kernel_dim2=7,
+        conv1 = Convolution3D(nb_filter=32, kernel_dim1=7, kernel_dim2=7,
                               kernel_dim3=7, init="he_normal",
                               border_mode="same",
                               W_regularizer=l2(1.e-4)
@@ -197,13 +197,17 @@ class Resnet3DBuilder(object):
         block_output = Activation("relu")(block_norm)
 
         # average poll and classification
-        pool1 = AveragePooling3D(pool_size=(block._keras_shape[DIM1_AXIS],
+        pool2 = AveragePooling3D(pool_size=(block._keras_shape[DIM1_AXIS],
                                             block._keras_shape[DIM2_AXIS],
                                             block._keras_shape[DIM3_AXIS]),
                                  strides=(1, 1, 1))(block_output)
-        flatten1 = Flatten()(pool1)
-        dense = Dense(output_dim=num_outputs, init="he_normal",
-                      activation="softmax")(flatten1)
+        flatten1 = Flatten()(pool2)
+	if num_outputs > 1:
+            dense = Dense(output_dim=num_outputs, init="he_normal",
+                          activation="softmax")(flatten1)
+	else:
+            dense = Dense(output_dim=num_outputs, init="he_normal",
+                          activation="sigmoid")(flatten1)
 
         model = Model(input=input, output=dense)
         return model
