@@ -15,7 +15,7 @@ from models.resnet3d import Resnet3DBuilder
 
 directory = 'data/data-science-bowl/npy'
 image_set = 'sample_images'
-target_size = (224, 224, 224)
+target_size = (224, 224, 112)
 test_size = 0.2
 random_state = 42
 batch_size = 1

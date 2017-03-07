@@ -42,7 +42,7 @@ def get_pixels_hu(slices):
 
     return np.array(image, dtype=np.int16)
 
-def resample(image, scan, new_spacing=[1,1,1]):
+def resample(image, scan, new_spacing=[2,2,2]):
     # Determine current pixel spacing
     spacing = np.array([scan[0].SliceThickness] + scan[0].PixelSpacing, dtype=np.float32)
 
@@ -59,7 +59,7 @@ def resample(image, scan, new_spacing=[1,1,1]):
 def preprocessing(path):
     patient = load_scan(path)
     patient_pixels = get_pixels_hu(patient)
-    pix_resampled, spacing = resample(patient_pixels, patient, [1,1,1])
+    pix_resampled, spacing = resample(patient_pixels, patient, [2,2,2])
     print("HU converting: ({}, {}) "
           "--> ({}, {})".format(np.amin(patient[0].pixel_array),
                                 np.amax(patient[0].pixel_array),
