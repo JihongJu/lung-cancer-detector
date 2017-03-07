@@ -58,20 +58,55 @@ def img_to_array(img, dim_ordering='default'):
     return x
 
 
-def pad_to_shape(arr, target_size):
-    """Pad arrays such that it has the shape of target_size
+def to_shape(arr, target_size):
+    """Pad and/or crop arrays such that it has the shape of target_size
     """
+    # padd
+    arr_pad = pad(arr, target_size)
+    # crop
+    if arr_pad.shape != target_size:
+        arr_crop = crop3d(arr_pad, target_size)
+    else:
+        arr_crop = arr_pad
+    return arr_crop
+
+
+def pad(arr, target_size):
+    # pad
     arr_shape = arr.shape
     npad = ()
     for dim in range(len(arr_shape)):
         diff = target_size[dim] - arr_shape[dim]
-        before = int(diff / 2)
-        after = diff - before
+        if diff > 0:
+            before = int(diff / 2)
+            after = diff - before
+        else:
+            before = 0
+            after = 0
         npad += ((before, after),)
     pad_arr = np.pad(arr, pad_width=npad,
                      mode='constant',
                      constant_values=0)
     return pad_arr
+
+
+def crop3d(arr, target_size):
+    arr_shape = arr.shape
+    ncrop = ()
+    for dim in range(len(arr_shape)):
+        diff = arr_shape[dim] - target_size[dim]
+        if diff > 0:
+            start = int(diff / 2)
+            end = start + target_size[dim]
+        else:
+            start = 0
+            end = arr_shape[dim]
+        ncrop += ((start, end),)
+    crop_arr = arr[ncrop[0][0]:ncrop[0][1],
+                   ncrop[1][0]:ncrop[1][1],
+                   ncrop[2][0]:ncrop[2][1],
+                   ...]
+    return crop_arr
 
 
 class VolumeDataGenerator(object):
@@ -283,7 +318,7 @@ class DCMDataLoader(VolumeDataLoader):
         patient_pixels = get_pixels_hu(patient)
         pix_resampled, spacing = resample(patient_pixels, patient, [1, 1, 1])
         # pad to target_size
-        resampled_img = pad_to_shape(pix_resampled, self.target_size)
+        resampled_img = to_shape(pix_resampled, self.target_size)
         # todo
         arr = img_to_array(resampled_img, self.dim_ordering)
 
@@ -366,7 +401,7 @@ class NPYDataLoader(VolumeDataLoader):
         img_path = os.path.join(self.image_dir,
                                 '{}.npy'.format(fn))
         img = np.load(img_path)
-        pad_img = pad_to_shape(img, self.target_size)
+        pad_img = to_shape(img, self.target_size)
         arr = img_to_array(pad_img, self.dim_ordering)
 
         return arr

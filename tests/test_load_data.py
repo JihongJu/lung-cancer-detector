@@ -4,19 +4,23 @@ from preprocessing.volume_image import (
     VolumeDataGenerator,
     VolumeDataLoader,
     NPYDataLoader,
-    pad_to_shape
+    to_shape
 )
 
 
-def test_pad_to_shape():
+def test_to_shape():
     a = np.ones([3, 3, 3])
+    a[:, 1, :] = 2
     target_size = (5, 5, 5)
-    b = pad_to_shape(a, target_size)
+    b = to_shape(a, target_size)
     print b
     assert b.shape == (5, 5, 5)
-    c = pad_to_shape(a, (5, 3, 5))
+    c = to_shape(a, (5, 3, 5))
     print c
     assert c.shape == (5, 3, 5)
+    d = to_shape(a, (5, 2, 5))
+    print d
+    assert d.shape == (5, 2, 5)
 
 
 @pytest.fixture
@@ -39,7 +43,7 @@ def train_vol_loader():
         split='train',
         test_size=0.2,
         random_state=42,
-        target_size=(448, 448, 448)
+        target_size=(224, 224, 224)
     )
     return NPYDataLoader(**vol_load_args)
 
@@ -53,7 +57,7 @@ def test_vol_loader():
         split='val',
         test_size=0.2,
         random_state=42,
-        target_size=(448, 448, 448)
+        target_size=(224, 224, 224)
         )
     return NPYDataLoader(**vol_load_args)
 
@@ -65,11 +69,11 @@ def test_data_generator(vol_data_gen, train_vol_loader, test_vol_loader):
             batch_size=1, shuffle=True, seed=42)
     for i in range(16):
         batch_x, batch_y = train_generator.next()
-        assert batch_x.shape == (1, 448, 448, 448, 1)
+        assert batch_x.shape == (1, 224, 224, 224, 1)
     print('Test')
     test_generator = vol_data_gen.flow_from_loader(
         volume_data_loader=test_vol_loader,
         batch_size=1, shuffle=True, seed=42)
     for i in range(4):
         batch_x, batch_y = test_generator.next()
-        assert batch_x.shape == (1, 448, 448, 448, 1)
+        assert batch_x.shape == (1, 224, 224, 224, 1)
