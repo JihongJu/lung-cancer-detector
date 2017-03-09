@@ -8,8 +8,6 @@ import pandas as pd
 import nipy as ni
 import keras.backend as K
 from keras.preprocessing.image import Iterator
-from nipy.core.api import Image, vox2mni
-from nipy.labs.datasets.volumes.volume_img import VolumeImg
 from sklearn.model_selection import train_test_split
 
 
@@ -57,25 +55,25 @@ def img_to_array(img, dim_ordering='default'):
     return x
 
 
-def to_shape(arr, target_size):
-    """Pad and/or crop arrays such that it has the shape of target_size
+def to_shape(arr, target_shape, constant_values=0):
+    """Pad and/or crop arrays such that it has the shape of target_shape
     """
-    # padd
-    arr_pad = pad(arr, target_size)
+    # pad
+    arr_pad = pad(arr, target_shape)
     # crop
-    if arr_pad.shape != target_size:
-        arr_crop = crop3d(arr_pad, target_size)
+    if arr_pad.shape != target_shape:
+        arr_crop = crop4d(arr_pad, target_shape)
     else:
         arr_crop = arr_pad
     return arr_crop
 
 
-def pad(arr, target_size):
+def pad(arr, target_shape, constant_values=0):
     # pad
     arr_shape = arr.shape
     npad = ()
     for dim in range(len(arr_shape)):
-        diff = target_size[dim] - arr_shape[dim]
+        diff = target_shape[dim] - arr_shape[dim]
         if diff > 0:
             before = int(diff / 2)
             after = diff - before
@@ -85,18 +83,18 @@ def pad(arr, target_size):
         npad += ((before, after),)
     pad_arr = np.pad(arr, pad_width=npad,
                      mode='constant',
-                     constant_values=0)
+                     constant_values=constant_values)
     return pad_arr
 
 
-def crop3d(arr, target_size):
+def crop4d(arr, target_shape):
     arr_shape = arr.shape
     ncrop = ()
     for dim in range(len(arr_shape)):
-        diff = arr_shape[dim] - target_size[dim]
+        diff = arr_shape[dim] - target_shape[dim]
         if diff > 0:
             start = int(diff / 2)
-            end = start + target_size[dim]
+            end = start + target_shape[dim]
         else:
             start = 0
             end = arr_shape[dim]
@@ -104,6 +102,7 @@ def crop3d(arr, target_size):
     crop_arr = arr[ncrop[0][0]:ncrop[0][1],
                    ncrop[1][0]:ncrop[1][1],
                    ncrop[2][0]:ncrop[2][1],
+                   ncrop[3][0]:ncrop[3][1],
                    ...]
     return crop_arr
 
@@ -115,6 +114,7 @@ class VolumeDataGenerator(object):
                  pixel_mean=None,
                  pixelwise_normalization=None,
                  pixel_bounds=None,
+                 target_size=(224, 224, 224),
                  preprocessing_function=None, dim_ordering='default'):
         """
         # Arguments
@@ -148,12 +148,26 @@ class VolumeDataGenerator(object):
             self.dim3_axis = 3
         self.dim_ordering = dim_ordering
 
+        self.target_size = tuple(target_size)
+        if len(target_size) != 3:
+            raise ValueError('Volumetric data requires 3 dimensions for '
+                             'target_size. Got {} dimensions'.format(
+                                 len(target_size)))
+
+        if self.dim_ordering == 'tf':
+            self.image_shape = self.target_size + (1,)
+        else:
+            self.image_shape = (1,) + self.target_size
+
+
+
     def flow_from_loader(self, volume_data_loader,
-                         class_mode='binary',
+                         class_mode='binary', nb_classes=None,
                          batch_size=1, shuffle=True, seed=None):
         return VolumeLoaderIterator(
             volume_data_loader, self,
             class_mode=class_mode,
+            nb_classes=nb_classes,
             batch_size=batch_size,
             shuffle=shuffle,
             seed=seed
@@ -164,13 +178,21 @@ class VolumeDataGenerator(object):
         center/normalization, etc."""
         if self.preprocessing_function:
             x = self.preprocessing_function(x)
-        if self.pixelwise_center:
-            if self.pixel_mean is not None:
-                x -= self.pixel_mean
+        if self.target_size:
+            x = to_shape(x, self.image_shape, constant_values=-1024)
         if self.pixelwise_normalization:
             if self.pixel_bounds is not None:
                 x = pixelwise_normalize(x, self.pixel_bounds)
-        pass
+        if self.pixelwise_center:
+            if self.pixel_mean is not None:
+                x -= self.pixel_mean
+        #self.samplewise_center = True
+        #self.samplewise_std_normalization = True
+        #if self.samplewise_center:
+        #    x -= np.mean(x, axis=img_channel_axis, keepdims=True)
+        #if self.samplewise_std_normalization:
+        #    x /= (np.std(x, axis=img_channel_axis, keepdims=True) + 1e-7)
+        return x
 
     def random_transform(self, x):
         """random transforms including flipping"""
@@ -180,15 +202,16 @@ class VolumeDataGenerator(object):
 class VolumeLoaderIterator(Iterator):
 
     def __init__(self, volume_data_loader, volume_data_generator,
-                 class_mode='binary',
+                 class_mode='binary', nb_classes=None,
                  batch_size=1, shuffle=False, seed=None):
         self.volume_data_loader = volume_data_loader
         self.volume_data_generator = volume_data_generator
         self.class_mode = class_mode
+        self.nb_classes = nb_classes
 
         self.filenames = volume_data_loader.filenames
         self.nb_sample = len(self.filenames)
-        self.image_shape = volume_data_loader.image_shape
+        self.image_shape = volume_data_generator.image_shape
         self.classes = volume_data_loader.classes
 
         super(VolumeLoaderIterator, self).__init__(self.nb_sample, batch_size,
@@ -213,10 +236,9 @@ class VolumeLoaderIterator(Iterator):
         elif self.class_mode == 'binary':
             batch_y = self.classes[index_array].astype(K.floatx())
         elif self.class_mode == 'categorical':
-            batch_y = np.zeros((len(batch_x), self.nb_class), dtype=K.floatx())
+            batch_y = np.zeros((len(batch_x), self.nb_classes), dtype=K.floatx())
             for i, label in enumerate(self.classes[index_array]):
                 batch_y[i, label] = 1.
-
         return batch_x, batch_y
 
 
@@ -229,7 +251,7 @@ class VolumeDataLoader(object):
     """
     def __init__(self, directory, image_set, image_format='dcm',
                  split='train', test_size=0.2, random_state=42,
-                 target_size=(448, 448, 448), dim_ordering='default',
+                 dim_ordering='default',
                  save_to_dir=None, save_prefix='', save_format='dcm'):
         self.directory = directory
         self.image_set = image_set
@@ -260,22 +282,12 @@ class VolumeDataLoader(object):
             raise ValueError('Invalid image format:', image_format,
                              '; expected "dcm", "nii".')
 
-        self.target_size = tuple(target_size)
-        if len(target_size) != 3:
-            raise ValueError('Volumetric data requires 3 dimensions for '
-                             'target_size. Got {} dimensions'.format(
-                                 len(target_size)))
-
         if dim_ordering not in {'default', 'tf', 'th'}:
             raise ValueError('Invalid dim ordering:', dim_ordering,
                              '; expected "default", "tf" or "th".')
         self.dim_ordering = dim_ordering
         if dim_ordering == 'default':
             self.dim_ordering = K.image_dim_ordering()
-        if self.dim_ordering == 'tf':
-            self.image_shape = self.target_size + (1,)
-        else:
-            self.image_shape = (1,) + self.target_size
 
         # split train test or keep all
         filenames_train, filenames_test, classes_train, classes_test \
@@ -316,10 +328,8 @@ class DCMDataLoader(VolumeDataLoader):
         patient = load_scan(img_path)
         patient_pixels = get_pixels_hu(patient)
         pix_resampled, spacing = resample(patient_pixels, patient, [1, 1, 1])
-        # pad to target_size
-        resampled_img = to_shape(pix_resampled, self.target_size)
-        # todo
-        arr = img_to_array(resampled_img, self.dim_ordering)
+
+        arr = img_to_array(pix_resampled, self.dim_ordering)
 
         return arr
 
@@ -400,7 +410,6 @@ class NPYDataLoader(VolumeDataLoader):
         img_path = os.path.join(self.image_dir,
                                 '{}.npy'.format(fn))
         img = np.load(img_path)
-        pad_img = to_shape(img, self.target_size)
-        arr = img_to_array(pad_img, self.dim_ordering)
+        arr = img_to_array(img, self.dim_ordering)
 
         return arr
