@@ -5,5 +5,4 @@ scipy==0.18.1
 pandas==0.19.2
 pydicom==0.9.9
 nipy==0.4.1
-h5py
-#nibabel==2.1.0
+h5py==2.6.0

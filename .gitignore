@@ -92,3 +92,4 @@ ENV/
 *.dcm
 *.nii.gz
 *.npy
+data-science-bowl

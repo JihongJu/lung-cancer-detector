@@ -5,7 +5,11 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import numpy as np
 from keras.utils import np_utils
-from keras.callbacks import ReduceLROnPlateau, CSVLogger, EarlyStopping
+from keras.callbacks import (
+    ReduceLROnPlateau,
+    CSVLogger,
+    EarlyStopping,
+    ModelCheckpoint)
 from preprocessing.volume_image import (
     VolumeDataGenerator,
     NPYDataLoader
@@ -14,19 +18,20 @@ from models.resnet3d import Resnet3DBuilder
 
 
 directory = 'data/data-science-bowl/npy'
-image_set = 'sample_images'
-target_size = (64, 64, 64)
+image_set = 'stage1'
+target_size = (224, 224, 224)
 test_size = 0.2
 random_state = 42
 batch_size = 1
 class_mode = 'binary'
 nb_classes = 1
-samples_per_epoch = 16
-nb_val_samples = 4
-nb_epoch = 10
+samples_per_epoch = 1116
+nb_val_samples = 280
+nb_epoch = 20
 data_augmentation = True
 
 
+checkpointer = ModelCheckpoint(filepath="/tmp/resnet18_weights.hdf5", verbose=1, save_best_only=True)
 lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                factor=np.sqrt(0.1),
                                cooldown=0,
