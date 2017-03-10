@@ -268,7 +268,7 @@ class VolumeDataLoader(object):
         self.test_size = test_size
 
         if self.split == 'test':
-            suffix = 'sample_submision'
+            suffix = 'sample_submission'
         else:
             suffix = 'labels'
         try:

@@ -14,14 +14,15 @@ from preprocessing.volume_image import (
     VolumeDataGenerator,
     NPYDataLoader
 )
-from models.resnet3d import Resnet3DBuilder
+from keras.models import load_model
+
 
 directory = 'data/data-science-bowl/npy'
 image_set = 'stage1'
 target_size = (224, 224, 224)
 test_size = 0.2
 random_state = 42
-batch_size = 2
+batch_size = 1
 class_mode = 'binary'
 nb_classes = 1
 samples_per_epoch = 1116
@@ -30,13 +31,13 @@ nb_epoch = 20
 data_augmentation = True
 
 
-checkpointer = ModelCheckpoint(filepath="/tmp/resnet34_weights.hdf5", verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="/tmp/resnet18_weights.hdf5", verbose=1, save_best_only=True)
 lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                factor=np.sqrt(0.1),
                                cooldown=0,
                                patience=5, min_lr=0.5e-6)
 early_stopper = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10)
-csv_logger = CSVLogger('output/resnet34_{}.csv'.format(image_set))
+csv_logger = CSVLogger('output/resnet18_{}.ctd.csv'.format(image_set))
 
 train_datagen = VolumeDataGenerator(
     pixelwise_center=True,
@@ -69,11 +70,8 @@ test_vol_loader = NPYDataLoader(
     random_state=random_state
     )
 
-model = Resnet3DBuilder.build_resnet_34(target_size + (1,), nb_classes)
-model.compile(loss="binary_crossentropy",
-              optimizer="adam",
-              metrics=['accuracy'])
 
+model = load_model('output/resnet18_{}.h5'.format(image_set))
 
 model.fit_generator(
     train_datagen.flow_from_loader(
@@ -94,4 +92,4 @@ model.fit_generator(
     verbose=1, max_q_size=100,
     callbacks=[lr_reducer, early_stopper, csv_logger]
 )
-model.save('output/resnet34_{}.h5'.format(image_set))
+model.save('output/resnet18_{}.ctd.h5'.format(image_set))

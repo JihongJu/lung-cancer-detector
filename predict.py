@@ -43,13 +43,21 @@ model = load_model('output/resnet18_stage1.h5')
 
 
 df_subm = pd.DataFrame(columns=['id', 'cancer'])
-for idx, fn in enumerate(test_vol_loader.filenames[:2]):
+for idx, fn in enumerate(test_vol_loader.filenames):
     x = test_vol_loader.load(fn)
     x = test_datagen.standardize(x)
-    print("Predicting {} (Shape: {})".format(fn, x.shape))
-    y = model.predict_classes(x, batch_size=1)
+    x = x[np.newaxis, ...]
+    print("Predicting {} (batch shape: {})".format(fn, x.shape))
+    proba = model.predict(x, batch_size=1)
+    print(proba)
+    if proba.shape[-1] > 1:
+        y = proba.argmax(axis=-1)
+    else:
+        y = (proba > 0.5).astype('int32')
+    y = y[0][0]
+    print("Prediction {fn},{y} ".format(fn=fn, y=y))
     df_subm.loc[idx, 'id'] = fn
     df_subm.loc[idx, 'cancer'] = y
 
-df_subm.to_csv('output/stage1_submission_resnet18',index=False)
+df_subm.to_csv('output/stage1_submission_resnet18.csv',index=False)
 
