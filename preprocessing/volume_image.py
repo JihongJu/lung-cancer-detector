@@ -249,7 +249,7 @@ class VolumeDataLoader(object):
         \${image_set}
         ${image_set}_labels.csv
     """
-    def __init__(self, directory, image_set, image_format='dcm',
+    def __init__(self, directory, image_set, image_format='npy',
                  split='train', test_size=0.2, random_state=42,
                  dim_ordering='default',
                  save_to_dir=None, save_prefix='', save_format='dcm'):
@@ -282,7 +282,7 @@ class VolumeDataLoader(object):
         self.classes = df_labels['cancer'].values.astype('int')
 
         self.image_format = image_format
-        white_list_formats = {'dcm', 'nii', 'npy'}
+        white_list_formats = {'dcm', 'nii', 'npy', 'h5'}
         if image_format not in white_list_formats:
             raise ValueError('Invalid image format:', image_format,
                              '; expected "dcm", "nii".')
