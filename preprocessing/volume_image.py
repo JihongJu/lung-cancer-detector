@@ -260,17 +260,22 @@ class VolumeDataLoader(object):
             raise IOError('Directory {} does not exist. Please provide a '
                           'valid directory.'.format(self.image_dir))
 
-        if split not in {'train', 'val', 'trainval'}:
+        if split not in {'train', 'val', 'trainval', 'test'}:
             raise ValueError('dataset split must be in '
                              '{"train", "val", "trainval"} '
                              'Got {}'.format(split))
         self.split = split
         self.test_size = test_size
 
+        if self.split == 'test':
+            suffix = 'sample_submision'
+        else:
+            suffix = 'labels'
         try:
             df_labels = pd.read_csv(
                 os.path.join(self.directory,
-                             "{}_labels.csv".format(self.image_set)))
+                             "{}_{}.csv".format(self.image_set,
+                                                suffix)))
         except IOError:
             raise
         self.filenames = df_labels['id'].values
@@ -299,6 +304,8 @@ class VolumeDataLoader(object):
         elif self.split == 'val':
             self.filenames = filenames_test
             self.classes = classes_test
+        else:
+            pass
 
         self.save_to_dir = save_to_dir
         self.save_prefix = save_prefix
