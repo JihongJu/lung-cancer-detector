@@ -9,7 +9,7 @@ import nipy as ni
 import keras.backend as K
 from keras.preprocessing.image import Iterator
 from sklearn.model_selection import train_test_split
-
+from imblearn.under_sampling import RandomUnderSampler
 
 def pixelwise_normalize(image, pixel_bounds):
     if len(pixel_bounds) != 2:
@@ -115,6 +115,7 @@ class VolumeDataGenerator(object):
                  pixelwise_normalization=None,
                  pixel_bounds=None,
                  target_size=(224, 224, 224),
+                 imlearn_resampler=None,
                  preprocessing_function=None, dim_ordering='default'):
         """
         # Arguments
@@ -127,6 +128,9 @@ class VolumeDataGenerator(object):
         self.pixel_mean = pixel_mean
         self.pixelwise_normalization = pixelwise_normalization
         self.pixel_bounds = pixel_bounds
+        if imlearn_resampler and imlearn_resampler not in {'rus'}:
+            raise ValueError("imlearn_resampler must be in {'rus'}.")
+        self.imlearn_resampler = imlearn_resampler
         self.preprocessing_function = preprocessing_function
         # image_dim_ordering
         if dim_ordering == 'default':
@@ -168,6 +172,7 @@ class VolumeDataGenerator(object):
             volume_data_loader, self,
             class_mode=class_mode,
             nb_classes=nb_classes,
+            imlearn_resampler=self.imlearn_resampler,
             batch_size=batch_size,
             shuffle=shuffle,
             seed=seed
@@ -202,7 +207,7 @@ class VolumeDataGenerator(object):
 class VolumeLoaderIterator(Iterator):
 
     def __init__(self, volume_data_loader, volume_data_generator,
-                 class_mode='binary', nb_classes=None,
+                 class_mode='binary', nb_classes=None, imlearn_resampler=None,
                  batch_size=1, shuffle=False, seed=None):
         self.volume_data_loader = volume_data_loader
         self.volume_data_generator = volume_data_generator
@@ -210,12 +215,27 @@ class VolumeLoaderIterator(Iterator):
         self.nb_classes = nb_classes
 
         self.filenames = volume_data_loader.filenames
+        self.classes = volume_data_loader.classes
         self.nb_sample = len(self.filenames)
         self.image_shape = volume_data_generator.image_shape
-        self.classes = volume_data_loader.classes
+        
+        # Random under sampler for imbalanced class
+        self.imlearn_resampler = imlearn_resampler
+        if imlearn_resampler:
+            self.filenames_imbalanced = self.filenames.copy()
+            self.classes_imbalanced = self.classes.copy()
+	if imlearn_resampler == 'rus':
+            self.resampler = RandomUnderSampler()
 
         super(VolumeLoaderIterator, self).__init__(self.nb_sample, batch_size,
                                                    shuffle, seed)
+    def reset(self):
+        # ensure self.batch_index is 0
+        self.batch_index = 0
+        # resampling imbalanced dataset
+        if self.imlearn_resampler:
+            self.filenames, self.classes = self.resampler.fit_sample(
+                 self.filenames_imbalanced, self.classes_imbalanced)
 
     def next(self):
         with self.lock:

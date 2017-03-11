@@ -18,15 +18,17 @@ from models.resnet3d import Resnet3DBuilder
 
 directory = 'data/data-science-bowl/npy'
 image_set = 'stage1'
-target_size = (224, 224, 224)
+target_size = (96, 96, 96)
 test_size = 0.2
 random_state = 42
-batch_size = 2
+batch_size = 32
 class_mode = 'binary'
 nb_classes = 1
+#samples_per_epoch = 16
+#nb_val_samples = 4
 samples_per_epoch = 1116
 nb_val_samples = 280
-nb_epoch = 20
+nb_epoch = 100
 data_augmentation = True
 
 
@@ -43,6 +45,8 @@ train_datagen = VolumeDataGenerator(
     pixel_mean=0.25,
     pixelwise_normalization=True,
     pixel_bounds=(-1000, 400),
+    imlearn_resampler=None,
+    #imlearn_resampler='rus',
     target_size=target_size
 )
 test_datagen = VolumeDataGenerator(
@@ -50,6 +54,7 @@ test_datagen = VolumeDataGenerator(
     pixel_mean=0.25,
     pixelwise_normalization=True,
     pixel_bounds=(-1000, 400),
+    imlearn_resampler=None,
     target_size=target_size
 )
 train_vol_loader = NPYDataLoader(
