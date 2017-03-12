@@ -127,7 +127,7 @@ def basic_block(nb_filter, init_subsample=(1, 1, 1),
                                   kernel_dim1=3, kernel_dim2=3, kernel_dim3=3,
                                   subsample=init_subsample,
                                   init="he_normal", border_mode="same",
-                                  W_regularizer=l2(0.0001)
+                                  W_regularizer=l2(1e-4)
                                   )(input)
         else:
             conv1 = _bn_relu_conv3d(nb_filter=nb_filter,
@@ -226,10 +226,10 @@ class Resnet3DBuilder(object):
         flatten1 = Flatten()(pool2)
         if num_outputs > 1:
             dense = Dense(output_dim=num_outputs, init="he_normal",
-                          activation="softmax", W_regularizer=l2(1e-4))(flatten1)
+                          activation="softmax", W_regularizer=l2(1e-2))(flatten1)
         else:
             dense = Dense(output_dim=num_outputs, init="he_normal",
-                          activation="sigmoid", W_regularizer=l2(1.e-4))(flatten1)
+                          activation="sigmoid", W_regularizer=l2(1e-2))(flatten1)
 
         model = Model(input=input, output=dense)
         return model
