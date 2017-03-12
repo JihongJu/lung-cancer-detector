@@ -28,7 +28,7 @@ nb_classes = 1
 #nb_val_samples = 4
 samples_per_epoch = 1116
 nb_val_samples = 280
-nb_epoch = 100
+nb_epoch = 200
 data_augmentation = True
 
 
@@ -37,7 +37,7 @@ lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                factor=np.sqrt(0.1),
                                cooldown=0,
                                patience=5, min_lr=0.5e-6)
-early_stopper = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=20)
+early_stopper = EarlyStopping(monitor='val_loss', min_delta=0.001, patience=150)
 csv_logger = CSVLogger('output/resnet34_{}.csv'.format(image_set))
 
 train_datagen = VolumeDataGenerator(

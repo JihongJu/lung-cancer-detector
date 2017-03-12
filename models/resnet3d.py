@@ -226,10 +226,10 @@ class Resnet3DBuilder(object):
         flatten1 = Flatten()(pool2)
         if num_outputs > 1:
             dense = Dense(output_dim=num_outputs, init="he_normal",
-                          activation="softmax")(flatten1)
+                          activation="softmax", W_regularizer=l2(1e-4))(flatten1)
         else:
             dense = Dense(output_dim=num_outputs, init="he_normal",
-                          activation="sigmoid")(flatten1)
+                          activation="sigmoid", W_regularizer=l2(1.e-4))(flatten1)
 
         model = Model(input=input, output=dense)
         return model
