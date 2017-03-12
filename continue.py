@@ -19,7 +19,7 @@ from keras.models import load_model
 
 directory = 'data/data-science-bowl/npy'
 image_set = 'stage1'
-target_size = (224, 224, 224)
+target_size = (96, 96, 96)
 test_size = 0.2
 random_state = 42
 batch_size = 1
@@ -27,17 +27,17 @@ class_mode = 'binary'
 nb_classes = 1
 samples_per_epoch = 1116
 nb_val_samples = 280
-nb_epoch = 20
+nb_epoch = 100
 data_augmentation = True
 
 
-checkpointer = ModelCheckpoint(filepath="/tmp/resnet18_weights.hdf5", verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="/tmp/resnet34_weights.hdf5", verbose=1, save_best_only=True)
 lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                factor=np.sqrt(0.1),
                                cooldown=0,
                                patience=5, min_lr=0.5e-6)
-early_stopper = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10)
-csv_logger = CSVLogger('output/resnet18_{}.ctd.csv'.format(image_set))
+early_stopper = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=20)
+csv_logger = CSVLogger('output/resnet34_{}.ctd.csv'.format(image_set))
 
 train_datagen = VolumeDataGenerator(
     pixelwise_center=True,
@@ -71,7 +71,7 @@ test_vol_loader = NPYDataLoader(
     )
 
 
-model = load_model('output/resnet18_{}.h5'.format(image_set))
+model = load_model('output/resnet34_{}.h5'.format(image_set))
 
 model.fit_generator(
     train_datagen.flow_from_loader(
@@ -92,4 +92,4 @@ model.fit_generator(
     verbose=1, max_q_size=100,
     callbacks=[lr_reducer, early_stopper, csv_logger]
 )
-model.save('output/resnet18_{}.ctd.h5'.format(image_set))
+model.save('output/resnet34_{}.ctd.h5'.format(image_set))

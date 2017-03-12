@@ -30,6 +30,7 @@ def vol_data_gen():
         pixel_mean=0.25,
         pixelwise_normalization=True,
         pixel_bounds=(-1000, 400),
+        target_size=(96, 96, 96) 
     )
     return datagen
 
@@ -38,12 +39,11 @@ def vol_data_gen():
 def train_vol_loader():
     vol_load_args = dict(
         directory='data/data-science-bowl/npy',
-        image_set='sample_images',
+        image_set='stage1',
         image_format='npy',
         split='train',
         test_size=0.2,
-        random_state=42,
-        target_size=(224, 224, 224)
+        random_state=42
     )
     return NPYDataLoader(**vol_load_args)
 
@@ -52,12 +52,11 @@ def train_vol_loader():
 def test_vol_loader():
     vol_load_args = dict(
         directory='data/data-science-bowl/npy',
-        image_set='sample_images',
+        image_set='stage1',
         image_format='npy',
         split='val',
         test_size=0.2,
-        random_state=42,
-        target_size=(224, 224, 224)
+        random_state=42
         )
     return NPYDataLoader(**vol_load_args)
 
@@ -66,14 +65,20 @@ def test_data_generator(vol_data_gen, train_vol_loader, test_vol_loader):
     print('Train')
     train_generator = vol_data_gen.flow_from_loader(
             volume_data_loader=train_vol_loader,
-            batch_size=1, shuffle=True, seed=42)
+            batch_size=32, shuffle=True, seed=42)
     for i in range(16):
         batch_x, batch_y = train_generator.next()
-        assert batch_x.shape == (1, 224, 224, 224, 1)
+        assert batch_x.shape == (32, 96, 96, 96, 1)
     print('Test')
     test_generator = vol_data_gen.flow_from_loader(
         volume_data_loader=test_vol_loader,
-        batch_size=1, shuffle=True, seed=42)
+        batch_size=32, shuffle=True, seed=42)
     for i in range(4):
         batch_x, batch_y = test_generator.next()
-        assert batch_x.shape == (1, 224, 224, 224, 1)
+        assert batch_x.shape == (32, 96, 96, 96, 1)
+
+
+def test_data_loader(train_vol_loader, test_vol_loader):
+    filenames1 = train_vol_loader.filenames
+    filenames2 = test_vol_loader.filenames
+    assert len(np.intersect1d(filenames1, filenames2)) == 0

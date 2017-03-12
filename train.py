@@ -37,7 +37,7 @@ lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                factor=np.sqrt(0.1),
                                cooldown=0,
                                patience=5, min_lr=0.5e-6)
-early_stopper = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10)
+early_stopper = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=20)
 csv_logger = CSVLogger('output/resnet34_{}.csv'.format(image_set))
 
 train_datagen = VolumeDataGenerator(
@@ -90,7 +90,7 @@ model.fit_generator(
     samples_per_epoch=samples_per_epoch,
     nb_epoch=nb_epoch,
     validation_data=test_datagen.flow_from_loader(
-        volume_data_loader=train_vol_loader,
+        volume_data_loader=test_vol_loader,
         batch_size=batch_size,
         class_mode=class_mode,
         nb_classes=nb_classes,

@@ -15,7 +15,7 @@ from keras.models import (load_model)
 
 directory = 'data/data-science-bowl/npy'
 image_set = 'stage1'
-target_size = (224, 224, 224)
+target_size = (96, 96, 96)
 class_mode = 'binary'
 nb_classes = 1
 samples_per_epoch = 1116
@@ -39,7 +39,7 @@ test_vol_loader = NPYDataLoader(
     split='test',
     )
 
-model = load_model('output/resnet18_stage1.h5')
+model = load_model('output/resnet34_stage1.h5')
 
 
 df_subm = pd.DataFrame(columns=['id', 'cancer'])
@@ -59,5 +59,5 @@ for idx, fn in enumerate(test_vol_loader.filenames):
     df_subm.loc[idx, 'id'] = fn
     df_subm.loc[idx, 'cancer'] = y
 
-df_subm.to_csv('output/stage1_submission_resnet18.csv',index=False)
+df_subm.to_csv('output/stage1_submission_resnet34.csv',index=False)
 
