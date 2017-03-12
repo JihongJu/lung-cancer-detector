@@ -1,23 +1,34 @@
-datagen:
+volume_data_generator:
     train: 
         pixelwise_center: True
         pixel_mean: 0.25
         pixelwise_normalization: True
-        pixel_bounds: (-1000, 400)
-        target_size: (96, 96. 96)
+        pixel_bounds:
+            - -1000
+            - 400
+        target_size:
+            - 96
+            - 96
+            - 96
+        #data_augmentation: True
     test:
         pixelwise_center: True
         pixel_mean: 0.25
         pixelwise_normalization: True
-        pixel_bounds: (-1000, 400)
-        target_size: (96, 96. 96)
-    flow:
+        pixel_bounds:
+            - -1000
+            - 400
+        target_size:
+            - 96
+            - 96
+            - 96
+        #data_augmentation: False
+    flow_from_loader:
         class_mode: "binary"
         nb_classes: 1
         batch_size: 32
         shuffle: True
-        data_augmentation: True
-loader:
+volume_data_loader:
     train:
         directory: "data/data-science-bowl/npy"
         image_set: "stage1"
@@ -25,12 +36,26 @@ loader:
         split: "train"
         test_size: 0.2
         random_state: 42
+    val:
+        directory: "data/data-science-bowl/npy"
+        image_set: "stage1"
+        image_format: "npy"
+        split: "val"
+        test_size: 0.2
+        random_state: 42
+    trainval:
+        directory: "data/data-science-bowl/npy"
+        image_set: "stage1"
+        image_format: "npy"
+        split: "trainval"
+        test_size: 0.
+        random_state: 42
     test:
         directory: "data/data-science-bowl/npy"
         image_set: "stage1"
         image_format: "npy"
         split: "test"
-        test_size: 0.2
+        test_size: 1.
         random_state: 42
 model:
     compile:
@@ -39,8 +64,9 @@ model:
         metrics:
             - "accuracy"
     fit_generator:
-        samples_per_epoch: 1116
+        samples_per_epoch: 1196
         nb_epoch: 100
         nb_val_samples: 280
         verbose: 1
         max_q_size: 100
+

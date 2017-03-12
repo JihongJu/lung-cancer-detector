@@ -114,7 +114,7 @@ class VolumeDataGenerator(object):
                  pixel_mean=None,
                  pixelwise_normalization=None,
                  pixel_bounds=None,
-                 target_size=(224, 224, 224),
+                 target_size=(96, 96, 96),
                  imlearn_resampler=None,
                  preprocessing_function=None, dim_ordering='default'):
         """
@@ -218,7 +218,7 @@ class VolumeLoaderIterator(Iterator):
         self.classes = volume_data_loader.classes
         self.nb_sample = len(self.filenames)
         self.image_shape = volume_data_generator.image_shape
-        
+
         # Random under sampler for imbalanced class
         self.imlearn_resampler = imlearn_resampler
         if imlearn_resampler:
@@ -280,7 +280,7 @@ class VolumeDataLoader(object):
             raise IOError('Directory {} does not exist. Please provide a '
                           'valid directory.'.format(self.image_dir))
 
-        if split not in {'train', 'val', 'trainval', 'test'}:
+        if split not in {'train', 'val', 'trainval', 'test', 'predict'}:
             raise ValueError('dataset split must be in '
                              '{"train", "val", "trainval"} '
                              'Got {}'.format(split))
