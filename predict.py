@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division,
 import numpy as np
 import pandas as pd
 from preprocessing.volume_image import (
-    VolumeDataGenerator,
+    VolumeImageDataGenerator,
     NPYDataLoader
 )
 from keras.models import (load_model)
@@ -19,19 +19,19 @@ with open("config.yml", 'r') as stream:
     except yaml.YAMLError as exc:
         print(exc)
 
-image_set = config_args['volume_data_loader']['train']['image_set']
-target_size = tuple(config_args['volume_data_generator']['train']['target_size'])
-nb_classes = config_args['volume_data_generator']['flow_from_loader']['nb_classes']
+image_set = config_args['volume_image_data_loader']['train']['image_set']
+target_size = tuple(config_args['volume_image_data_generator']['train']['target_size'])
+nb_classes = config_args['volume_image_data_generator']['flow_from_loader']['nb_classes']
 
-test_datagen = VolumeDataGenerator(
-        **config_args['volume_data_generator']['test'])
+test_datagen = VolumeImageDataGenerator(
+        **config_args['volume_image_data_generator']['test'])
 
 test_vol_loader = NPYDataLoader(
-        **config_args['volume_data_loader']['test'])
+        **config_args['volume_image_data_loader']['test'])
 
-iterator_args = config_args['volume_data_generator']['flow_from_loader']
+iterator_args = config_args['volume_image_data_generator']['flow_from_loader']
 test_iter_args = iterator_args.copy()
-test_iter_args['volume_data_loader'] = test_vol_loader
+test_iter_args['volume_image_data_loader'] = test_vol_loader
 
 
 model = load_model('output/resnet34_stage1.h5')

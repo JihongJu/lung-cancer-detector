@@ -107,7 +107,7 @@ def crop4d(arr, target_shape):
     return crop_arr
 
 
-class VolumeDataGenerator(object):
+class VolumeImageDataGenerator(object):
 
     def __init__(self,
                  pixelwise_center=None,
@@ -116,6 +116,8 @@ class VolumeDataGenerator(object):
                  pixel_bounds=None,
                  target_size=(96, 96, 96),
                  imlearn_resampler=None,
+                 samplewise_center=None,
+                 samplewise_std_normalization=None,
                  preprocessing_function=None, dim_ordering='default'):
         """
         # Arguments
@@ -163,13 +165,15 @@ class VolumeDataGenerator(object):
         else:
             self.image_shape = (1,) + self.target_size
 
+        self.samplewise_center = samplewise_center
+        self.samplewise_std_normalization = samplewise_std_normalization
 
 
-    def flow_from_loader(self, volume_data_loader,
+    def flow_from_loader(self, volume_image_data_loader,
                          class_mode='binary', nb_classes=None,
                          batch_size=1, shuffle=True, seed=None):
-        return VolumeLoaderIterator(
-            volume_data_loader, self,
+        return VolumeImageLoaderIterator(
+            volume_image_data_loader, self,
             class_mode=class_mode,
             nb_classes=nb_classes,
             imlearn_resampler=self.imlearn_resampler,
@@ -191,12 +195,10 @@ class VolumeDataGenerator(object):
         if self.pixelwise_center:
             if self.pixel_mean is not None:
                 x -= self.pixel_mean
-        #self.samplewise_center = True
-        #self.samplewise_std_normalization = True
-        #if self.samplewise_center:
-        #    x -= np.mean(x, axis=img_channel_axis, keepdims=True)
-        #if self.samplewise_std_normalization:
-        #    x /= (np.std(x, axis=img_channel_axis, keepdims=True) + 1e-7)
+        if self.samplewise_center:
+            x -= np.mean(x, axis=self.channel_axis, keepdims=True)
+        if self.samplewise_std_normalization:
+            x /= (np.std(x, axis=self.channel_axis, keepdims=True) + 1e-7)
         return x
 
     def random_transform(self, x):
@@ -204,20 +206,20 @@ class VolumeDataGenerator(object):
         pass
 
 
-class VolumeLoaderIterator(Iterator):
+class VolumeImageLoaderIterator(Iterator):
 
-    def __init__(self, volume_data_loader, volume_data_generator,
+    def __init__(self, volume_image_data_loader, volume_image_data_generator,
                  class_mode='binary', nb_classes=None, imlearn_resampler=None,
                  batch_size=1, shuffle=False, seed=None):
-        self.volume_data_loader = volume_data_loader
-        self.volume_data_generator = volume_data_generator
+        self.volume_image_data_loader = volume_image_data_loader
+        self.volume_image_data_generator = volume_image_data_generator
         self.class_mode = class_mode
         self.nb_classes = nb_classes
 
-        self.filenames = volume_data_loader.filenames
-        self.classes = volume_data_loader.classes
+        self.filenames = volume_image_data_loader.filenames
+        self.classes = volume_image_data_loader.classes
         self.nb_sample = len(self.filenames)
-        self.image_shape = volume_data_generator.image_shape
+        self.image_shape = volume_image_data_generator.image_shape
 
         # Random under sampler for imbalanced class
         self.imlearn_resampler = imlearn_resampler
@@ -227,7 +229,7 @@ class VolumeLoaderIterator(Iterator):
 	if imlearn_resampler == 'rus':
             self.resampler = RandomUnderSampler()
 
-        super(VolumeLoaderIterator, self).__init__(self.nb_sample, batch_size,
+        super(VolumeImageLoaderIterator, self).__init__(self.nb_sample, batch_size,
                                                    shuffle, seed)
     def reset(self):
         # ensure self.batch_index is 0
@@ -246,9 +248,9 @@ class VolumeLoaderIterator(Iterator):
         for i, j in enumerate(index_array):
             fname = self.filenames[j]
             # print("Loading {}, {}".format(j, fname))
-            x = self.volume_data_loader.load(fname)
+            x = self.volume_image_data_loader.load(fname)
             # augmentation goes here
-            x = self.volume_data_generator.standardize(x)
+            x = self.volume_image_data_generator.standardize(x)
             batch_x[i] = x
         # build batch of labels
         if self.class_mode == 'sparse':
@@ -262,7 +264,7 @@ class VolumeLoaderIterator(Iterator):
         return batch_x, batch_y
 
 
-class VolumeDataLoader(object):
+class VolumeImageDataLoader(object):
     """ Helper class for loading images
     # Data structure Overview
     \directory
@@ -344,7 +346,7 @@ class VolumeDataLoader(object):
         pass
 
 
-class DCMDataLoader(VolumeDataLoader):
+class DCMDataLoader(VolumeImageDataLoader):
     """Load dcm volume data using Kaggle kernel by Guido Zuidhof
     See https://www.kaggle.com/gzuidhof/data-science-bowl-2017/full-preprocessing-tutorial
     for details
@@ -418,7 +420,7 @@ def resample(image, scan, new_spacing=[1, 1, 1]):
     return image, new_spacing
 
 
-class NIIDataLoader(VolumeDataLoader):
+class NIIDataLoader(VolumeImageDataLoader):
 
     def load(self, fn):
         img_path = os.path.join(self.image_dir,
@@ -431,7 +433,7 @@ class NIIDataLoader(VolumeDataLoader):
         return arr
 
 
-class NPYDataLoader(VolumeDataLoader):
+class NPYDataLoader(VolumeImageDataLoader):
 
     def load(self, fn):
         img_path = os.path.join(self.image_dir,

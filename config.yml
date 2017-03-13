@@ -1,4 +1,4 @@
-volume_data_generator:
+volume_image_data_generator:
     train: 
         pixelwise_center: True
         pixel_mean: 0.25
@@ -28,7 +28,7 @@ volume_data_generator:
         nb_classes: 1
         batch_size: 32
         shuffle: True
-volume_data_loader:
+volume_image_data_loader:
     train:
         directory: "data/data-science-bowl/npy"
         image_set: "stage1"
@@ -64,7 +64,7 @@ model:
         metrics:
             - "accuracy"
     fit_generator:
-        samples_per_epoch: 1196
+        samples_per_epoch: 1116
         nb_epoch: 100
         nb_val_samples: 280
         verbose: 1
