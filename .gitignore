@@ -93,3 +93,4 @@ ENV/
 *.nii.gz
 *.npy
 data-science-bowl
+dicm2nii
