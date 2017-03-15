@@ -11,101 +11,6 @@ from keras.preprocessing.image import Iterator
 from sklearn.model_selection import train_test_split
 from imblearn.under_sampling import RandomUnderSampler
 
-def pixelwise_normalize(image, pixel_bounds):
-    if len(pixel_bounds) != 2:
-        raise ValueError("Expected tuple of pixel bounds "
-                         "(min_bound, max_bound). Got {}".format(pixel_bounds))
-    min_bound = pixel_bounds[0]
-    max_bound = pixel_bounds[1]
-    image = (image - min_bound) / (max_bound - min_bound)
-    image[image > 1] = 1.
-    image[image < 0] = 0.
-    return image
-
-
-def img_to_array(img, dim_ordering='default'):
-    """Converts VolumeImg to arr
-        # Arguments
-        img: VolumeImg instance.
-        dim_ordering: Image data format.
-    # Returns
-        A 4D Numpy array.
-    """
-    if dim_ordering == 'default':
-        dim_ordering = K.image_dim_ordering()
-    if dim_ordering not in {'th', 'tf'}:
-        raise ValueError('Unknown dim_ordering: ', dim_ordering)
-    # Numpy array x has format (height, width, channel)
-    # or (channel, height, width)
-    # but original PIL image has format (width, height, channel)
-    if isinstance(img, np.ndarray):
-        x = img.astype(K.floatx())
-    else:
-        x = img.get_data().astype(K.floatx())
-    if len(x.shape) == 4:
-        if dim_ordering == 'th':
-            x = x.transpose(3, 0, 1, 2)
-    elif len(x.shape) == 3:
-        if dim_ordering == 'th':
-            x = x.reshape((1, x.shape[0], x.shape[1], x.shape[2]))
-        else:
-            x = x.reshape((x.shape[0], x.shape[1], x.shape[2], 1))
-    else:
-        raise ValueError('Unsupported image shape: ', x.shape)
-    return x
-
-
-def to_shape(arr, target_shape, constant_values=0):
-    """Pad and/or crop arrays such that it has the shape of target_shape
-    """
-    # pad
-    arr_pad = pad(arr, target_shape)
-    # crop
-    if arr_pad.shape != target_shape:
-        arr_crop = crop4d(arr_pad, target_shape)
-    else:
-        arr_crop = arr_pad
-    return arr_crop
-
-
-def pad(arr, target_shape, constant_values=0):
-    # pad
-    arr_shape = arr.shape
-    npad = ()
-    for dim in range(len(arr_shape)):
-        diff = target_shape[dim] - arr_shape[dim]
-        if diff > 0:
-            before = int(diff / 2)
-            after = diff - before
-        else:
-            before = 0
-            after = 0
-        npad += ((before, after),)
-    pad_arr = np.pad(arr, pad_width=npad,
-                     mode='constant',
-                     constant_values=constant_values)
-    return pad_arr
-
-
-def crop4d(arr, target_shape):
-    arr_shape = arr.shape
-    ncrop = ()
-    for dim in range(len(arr_shape)):
-        diff = arr_shape[dim] - target_shape[dim]
-        if diff > 0:
-            start = int(diff / 2)
-            end = start + target_shape[dim]
-        else:
-            start = 0
-            end = arr_shape[dim]
-        ncrop += ((start, end),)
-    crop_arr = arr[ncrop[0][0]:ncrop[0][1],
-                   ncrop[1][0]:ncrop[1][1],
-                   ncrop[2][0]:ncrop[2][1],
-                   ncrop[3][0]:ncrop[3][1],
-                   ...]
-    return crop_arr
-
 
 class VolumeImageDataGenerator(object):
 
@@ -114,17 +19,22 @@ class VolumeImageDataGenerator(object):
                  pixel_mean=None,
                  pixelwise_normalization=None,
                  pixel_bounds=None,
-                 target_size=(96, 96, 96),
-                 imlearn_resampler=None,
                  samplewise_center=None,
                  samplewise_std_normalization=None,
-                 preprocessing_function=None, dim_ordering='default'):
+                 target_size=(96, 96, 96),
+                 imlearn_resampler=None,
+                 preprocessing_function=None,
+                 data_augmentation=None,
+                 dim_ordering='default'):
         """
         # Arguments
             pixelwise_center: substract pixel mean
             pixel_mean: dataset_mean (e.g. 0.25 for LUNA2016)
             pixelwise_normalization: scaled by pixel_bounds
             pixel_bounds: tuple of pixel bounds (min_bound, max_bound)
+            imlearn_resampler: resampler for imbalanced dataset {None, 'rus'}
+            data_augmentation: {True, False, None}
+            dim_ordering: Keras image_dim_ordering {'tf', 'th', 'default'}
         """
         self.pixelwise_center = pixelwise_center
         self.pixel_mean = pixel_mean
@@ -134,6 +44,7 @@ class VolumeImageDataGenerator(object):
             raise ValueError("imlearn_resampler must be in {'rus'}.")
         self.imlearn_resampler = imlearn_resampler
         self.preprocessing_function = preprocessing_function
+        self.data_augmentation = data_augmentation
         # image_dim_ordering
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
@@ -168,10 +79,9 @@ class VolumeImageDataGenerator(object):
         self.samplewise_center = samplewise_center
         self.samplewise_std_normalization = samplewise_std_normalization
 
-
     def flow_from_loader(self, volume_image_data_loader,
                          class_mode='binary', nb_classes=None,
-                         batch_size=1, shuffle=True, seed=None):
+                         batch_size=32, shuffle=True, seed=None):
         return VolumeImageLoaderIterator(
             volume_image_data_loader, self,
             class_mode=class_mode,
@@ -181,6 +91,7 @@ class VolumeImageDataGenerator(object):
             shuffle=shuffle,
             seed=seed
         )
+
 
     def standardize(self, x):
         """standardize inputs including featurewise/samplewise
@@ -354,70 +265,68 @@ class DCMDataLoader(VolumeImageDataLoader):
 
     def load(self, fn):
         img_path = os.path.join(self.directory, fn)
-        patient = load_scan(img_path)
-        patient_pixels = get_pixels_hu(patient)
-        pix_resampled, spacing = resample(patient_pixels, patient, [1, 1, 1])
+        patient = self.load_scan(img_path)
+        patient_pixels = self.get_pixels_hu(patient)
+        pix_resampled, spacing = self.resample(patient_pixels, patient, [1, 1, 1])
 
         arr = img_to_array(pix_resampled, self.dim_ordering)
 
         return arr
 
+    def load_scan(self, path):
+        slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
+        slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+        try:
+            slice_thickness = np.abs(slices[0].ImagePositionPatient[2]
+                                     - slices[1].ImagePositionPatient[2])
+        except:
+            slice_thickness = np.abs(slices[0].SliceLocation
+                                     - slices[1].SliceLocation)
+        for s in slices:
+            s.SliceThickness = slice_thickness
 
-def load_scan(path):
-    slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
-    slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
-    try:
-        slice_thickness = np.abs(slices[0].ImagePositionPatient[2]
-                                 - slices[1].ImagePositionPatient[2])
-    except:
-        slice_thickness = np.abs(slices[0].SliceLocation
-                                 - slices[1].SliceLocation)
-    for s in slices:
-        s.SliceThickness = slice_thickness
+        return slices
 
-    return slices
+    def get_pixels_hu(self, slices):
+        image = np.stack([s.pixel_array for s in slices])
+        # Convert to int16 (from sometimes int16),
+        # should be possible as values should always be low enough (<32k)
+        image = image.astype(np.int16)
 
+        # Set outside-of-scan pixels to 0
+        # The intercept is usually -1024, so air is approximately 0
+        image[image == -2000] = 0
 
-def get_pixels_hu(slices):
-    image = np.stack([s.pixel_array for s in slices])
-    # Convert to int16 (from sometimes int16),
-    # should be possible as values should always be low enough (<32k)
-    image = image.astype(np.int16)
+        # Convert to Hounsfield units (HU)
+        for slice_number in range(len(slices)):
 
-    # Set outside-of-scan pixels to 0
-    # The intercept is usually -1024, so air is approximately 0
-    image[image == -2000] = 0
+            intercept = slices[slice_number].RescaleIntercept
+            slope = slices[slice_number].RescaleSlope
 
-    # Convert to Hounsfield units (HU)
-    for slice_number in range(len(slices)):
+            if slope != 1:
+                image[slice_number] = slope * image[slice_number].astype(
+                    np.float64)
+                image[slice_number] = image[slice_number].astype(np.int16)
+            image[slice_number] += np.int16(intercept)
 
-        intercept = slices[slice_number].RescaleIntercept
-        slope = slices[slice_number].RescaleSlope
-
-        if slope != 1:
-            image[slice_number] = slope * image[slice_number].astype(
-                np.float64)
-            image[slice_number] = image[slice_number].astype(np.int16)
-        image[slice_number] += np.int16(intercept)
-
-    return np.array(image, dtype=np.int16)
+        return np.array(image, dtype=np.int16)
 
 
-def resample(image, scan, new_spacing=[1, 1, 1]):
-    # Determine current pixel spacing
-    spacing = np.array([scan[0].SliceThickness]
-                       + scan[0].PixelSpacing, dtype=np.float32)
+    def resample(self, image, scan, new_spacing=[1, 1, 1]):
+        # Determine current pixel spacing
+        spacing = np.array([scan[0].SliceThickness]
+                           + scan[0].PixelSpacing, dtype=np.float32)
 
-    resize_factor = spacing / new_spacing
-    new_real_shape = image.shape * resize_factor
-    new_shape = np.round(new_real_shape)
-    real_resize_factor = new_shape / image.shape
-    new_spacing = spacing / real_resize_factor
+        resize_factor = spacing / new_spacing
+        new_real_shape = image.shape * resize_factor
+        new_shape = np.round(new_real_shape)
+        real_resize_factor = new_shape / image.shape
+        new_spacing = spacing / real_resize_factor
 
-    image = scipy.ndimage.interpolation.zoom(image, real_resize_factor,
-                                             mode='nearest')
+        image = scipy.ndimage.interpolation.zoom(image, real_resize_factor,
+                                                 mode='nearest')
 
-    return image, new_spacing
+        return image, new_spacing
 
 
 class NIIDataLoader(VolumeImageDataLoader):
@@ -442,3 +351,100 @@ class NPYDataLoader(VolumeImageDataLoader):
         arr = img_to_array(img, self.dim_ordering)
 
         return arr
+
+
+def pixelwise_normalize(image, pixel_bounds):
+    if len(pixel_bounds) != 2:
+        raise ValueError("Expected tuple of pixel bounds "
+                         "(min_bound, max_bound). Got {}".format(pixel_bounds))
+    min_bound = pixel_bounds[0]
+    max_bound = pixel_bounds[1]
+    image = (image - min_bound) / (max_bound - min_bound)
+    image[image > 1] = 1.
+    image[image < 0] = 0.
+    return image
+
+
+def img_to_array(img, dim_ordering='default'):
+    """Converts VolumeImg to arr
+        # Arguments
+        img: VolumeImg instance.
+        dim_ordering: Image data format.
+    # Returns
+        A 4D Numpy array.
+    """
+    if dim_ordering == 'default':
+        dim_ordering = K.image_dim_ordering()
+    if dim_ordering not in {'th', 'tf'}:
+        raise ValueError('Unknown dim_ordering: ', dim_ordering)
+    # Numpy array x has format (height, width, channel)
+    # or (channel, height, width)
+    # but original PIL image has format (width, height, channel)
+    if isinstance(img, np.ndarray):
+        x = img.astype(K.floatx())
+    else:
+        x = img.get_data().astype(K.floatx())
+    if len(x.shape) == 4:
+        if dim_ordering == 'th':
+            x = x.transpose(3, 0, 1, 2)
+    elif len(x.shape) == 3:
+        if dim_ordering == 'th':
+            x = x.reshape((1, x.shape[0], x.shape[1], x.shape[2]))
+        else:
+            x = x.reshape((x.shape[0], x.shape[1], x.shape[2], 1))
+    else:
+        raise ValueError('Unsupported image shape: ', x.shape)
+    return x
+
+
+def to_shape(arr, target_shape, constant_values=0):
+    """Pad and/or crop arrays such that it has the shape of target_shape
+    """
+    # pad
+    arr_pad = pad(arr, target_shape)
+    # crop
+    if arr_pad.shape != target_shape:
+        arr_crop = crop4d(arr_pad, target_shape)
+    else:
+        arr_crop = arr_pad
+    return arr_crop
+
+
+def pad(arr, target_shape, constant_values=0):
+    # pad
+    arr_shape = arr.shape
+    npad = ()
+    for dim in range(len(arr_shape)):
+        diff = target_shape[dim] - arr_shape[dim]
+        if diff > 0:
+            before = int(diff / 2)
+            after = diff - before
+        else:
+            before = 0
+            after = 0
+        npad += ((before, after),)
+    pad_arr = np.pad(arr, pad_width=npad,
+                     mode='constant',
+                     constant_values=constant_values)
+    return pad_arr
+
+
+def crop4d(arr, target_shape):
+    arr_shape = arr.shape
+    ncrop = ()
+    for dim in range(len(arr_shape)):
+        diff = arr_shape[dim] - target_shape[dim]
+        if diff > 0:
+            start = int(diff / 2)
+            end = start + target_shape[dim]
+        else:
+            start = 0
+            end = arr_shape[dim]
+        ncrop += ((start, end),)
+    crop_arr = arr[ncrop[0][0]:ncrop[0][1],
+                   ncrop[1][0]:ncrop[1][1],
+                   ncrop[2][0]:ncrop[2][1],
+                   ncrop[3][0]:ncrop[3][1],
+                   ...]
+    return crop_arr
+

@@ -92,5 +92,5 @@ ENV/
 *.dcm
 *.nii.gz
 *.npy
-data-science-bowl
-dicm2nii
+*data-science-bowl*
+*dicm2nii*
