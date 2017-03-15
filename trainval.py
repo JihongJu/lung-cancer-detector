@@ -3,6 +3,8 @@
 
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
+import requests
+import argparse
 import numpy as np
 from keras.callbacks import (
     ReduceLROnPlateau,
@@ -10,9 +12,9 @@ from keras.callbacks import (
     EarlyStopping,
     ModelCheckpoint)
 from preprocessing.volume_image import (
-    VolumeImageDataGenerator,
-    NPYDataLoader
-)
+    VolumeImageDataGenerator)
+from preprocessing.image_loader import (
+    NPYDataLoader)
 from models.resnet3d import Resnet3DBuilder
 
 import yaml
@@ -22,18 +24,29 @@ with open("config.yml", 'r') as stream:
     except yaml.YAMLError as exc:
         print(exc)
 
-image_set = config_args['volume_image_data_loader']['train']['image_set']
-target_size = tuple(config_args['volume_image_data_generator']['train']['target_size'])
+# generate a random training title
+r = requests.get('https://frightanic.com/goodies_content/docker-names.php')
+if r.raise_for_status():
+    raise
+title = r.text.rstrip()
+
+# parset a training title
+parser = argparse.ArgumentParser(description='Continue a training.')
+parser.add_argument('-t', help='The title of the training to continue')
+args = parser.parse_args()
+if args.t:
+    title = args.t
+
 nb_classes = config_args['volume_image_data_generator']['flow_from_loader']['nb_classes']
 
 
-checkpointer = ModelCheckpoint(filepath="/tmp/resnet34_weights.hdf5", verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="/tmp/resnet34_weights_{}.hdf5".format(title), verbose=1, save_best_only=True)
 lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                factor=np.sqrt(0.1),
                                cooldown=0,
                                patience=5, min_lr=0.5e-6)
 early_stopper = EarlyStopping(monitor='val_loss', min_delta=0.001, patience=100)
-csv_logger = CSVLogger('output/resnet34_{}.csv'.format(image_set))
+csv_logger = CSVLogger('output/resnet34_{}.csv'.format(title))
 
 train_datagen = VolumeImageDataGenerator(
         **config_args['volume_image_data_generator']['train'])
@@ -51,7 +64,8 @@ train_iter_args['volume_image_data_loader'] = train_vol_loader
 val_iter_args = iterator_args.copy()
 val_iter_args['volume_image_data_loader'] = val_vol_loader
 
-model = Resnet3DBuilder.build_resnet_34(target_size + (1,), nb_classes)
+image_shape = train_datagen.image_shape
+model = Resnet3DBuilder.build_resnet_34(image_shape, nb_classes)
 model.compile(**config_args['model']['compile'])
 
 model_fit_args = config_args['model']['fit_generator']
@@ -60,4 +74,4 @@ model_fit_args['validation_data']=test_datagen.flow_from_loader(**val_iter_args)
 model_fit_args['callbacks']=[lr_reducer, early_stopper, csv_logger]
 
 model.fit_generator(**model_fit_args)
-model.save('output/resnet34_{}.h5'.format(image_set))
+model.save('output/resnet34_{}.h5'.format(title))

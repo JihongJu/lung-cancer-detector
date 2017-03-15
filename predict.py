@@ -5,11 +5,12 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import numpy as np
 import pandas as pd
-from preprocessing.volume_image import (
-    VolumeImageDataGenerator,
-    NPYDataLoader
-)
 from keras.models import (load_model)
+
+from preprocessing.volume_image import (
+    VolumeImageDataGenerator)
+from preprocessing.image_loader import (
+    NPYDataLoader)
 
 
 import yaml
@@ -18,10 +19,6 @@ with open("config.yml", 'r') as stream:
         config_args = yaml.load(stream)
     except yaml.YAMLError as exc:
         print(exc)
-
-image_set = config_args['volume_image_data_loader']['train']['image_set']
-target_size = tuple(config_args['volume_image_data_generator']['train']['target_size'])
-nb_classes = config_args['volume_image_data_generator']['flow_from_loader']['nb_classes']
 
 test_datagen = VolumeImageDataGenerator(
         **config_args['volume_image_data_generator']['test'])

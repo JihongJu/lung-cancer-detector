@@ -6,11 +6,11 @@ volume_image_data_generator:
         pixel_bounds:
             - -1000
             - 400
-        target_size:
+        target_shape:
             - 96
             - 96
             - 96
-        #data_augmentation: True
+        data_augmentation: True
     test:
         pixelwise_center: True
         pixel_mean: 0.25
@@ -18,11 +18,11 @@ volume_image_data_generator:
         pixel_bounds:
             - -1000
             - 400
-        target_size:
+        target_shape:
             - 96
             - 96
             - 96
-        #data_augmentation: False
+        data_augmentation: False
     flow_from_loader:
         class_mode: "binary"
         nb_classes: 1
@@ -30,29 +30,29 @@ volume_image_data_generator:
         shuffle: True
 volume_image_data_loader:
     train:
-        directory: "data/data-science-bowl/npy"
-        image_set: "stage1"
+        image_dir: "data/data-science-bowl/npy/stage1"
+        label_dir: "data/data-science-bowl/stage1_labels.csv"
         image_format: "npy"
         split: "train"
         test_size: 0.2
         random_state: 42
     val:
-        directory: "data/data-science-bowl/npy"
-        image_set: "stage1"
+        image_dir: "data/data-science-bowl/npy/stage1"
+        label_dir: "data/data-science-bowl/stage1_labels.csv"
         image_format: "npy"
         split: "val"
         test_size: 0.2
         random_state: 42
     trainval:
-        directory: "data/data-science-bowl/npy"
-        image_set: "stage1"
+        image_dir: "data/data-science-bowl/npy/stage1"
+        label_dir: "data/data-science-bowl/stage1_labels.csv"
         image_format: "npy"
         split: "trainval"
         test_size: 0.
         random_state: 42
     test:
-        directory: "data/data-science-bowl/npy"
-        image_set: "stage1"
+        image_dir: "data/data-science-bowl/npy/stage1"
+        label_dir: "data/data-science-bowl/stage1_sample_submissions.csv"
         image_format: "npy"
         split: "test"
         test_size: 1.
