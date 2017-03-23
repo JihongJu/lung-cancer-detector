@@ -6,15 +6,15 @@ from keras.models import Model
 from keras.layers import (
     Input,
     Activation,
-    merge,
     Dense,
     Flatten
 )
 from keras.layers.convolutional import (
-    Convolution3D,
+    Conv3D,
     AveragePooling3D,
     MaxPooling3D
 )
+from keras.layers.merge import add
 from keras.layers.normalization import BatchNormalization
 from keras.regularizers import l2
 from keras import backend as K
@@ -29,21 +29,20 @@ def _bn_relu(input):
 
 
 def _conv_bn_relu3D(**conv_params):
-    nb_filter = conv_params["nb_filter"]
-    kernel_dim1 = conv_params["kernel_dim1"]
-    kernel_dim2 = conv_params["kernel_dim2"]
-    kernel_dim3 = conv_params["kernel_dim3"]
-    subsample = conv_params.setdefault("subsample", (1, 1, 1))
-    init = conv_params.setdefault("init", "he_normal")
-    border_mode = conv_params.setdefault("border_mode", "same")
-    W_regularizer = conv_params.setdefault("W_regularizer", l2(1.e-4))
+    nb_filter = conv_params["filters"]
+    kernel_size = conv_params["kernel_size"]
+    strides = conv_params.setdefault("strides", (1, 1, 1))
+    kernel_initializer = conv_params.setdefault(
+        "kernel_initializer", "he_normal")
+    padding = conv_params.setdefault("padding", "same")
+    kernel_regularizer = conv_params.setdefault("kernel_regularizer",
+                                                l2(1.e-4))
 
     def f(input):
-        conv = Convolution3D(nb_filter=nb_filter, kernel_dim1=kernel_dim1,
-                             kernel_dim2=kernel_dim2, kernel_dim3=kernel_dim3,
-                             subsample=subsample, init=init,
-                             border_mode=border_mode,
-                             W_regularizer=W_regularizer)(input)
+        conv = Conv3D(filters=nb_filter, kernel_size=kernel_size,
+                      strides=strides, kernel_initializer=kernel_initializer,
+                      padding=padding,
+                      kernel_regularizer=kernel_regularizer)(input)
         return _bn_relu(conv)
 
     return f
@@ -52,22 +51,21 @@ def _conv_bn_relu3D(**conv_params):
 def _bn_relu_conv3d(**conv_params):
     """Helper to build a  BN -> relu -> conv3d block.
     """
-    nb_filter = conv_params["nb_filter"]
-    kernel_dim1 = conv_params["kernel_dim1"]
-    kernel_dim2 = conv_params["kernel_dim2"]
-    kernel_dim3 = conv_params["kernel_dim3"]
-    subsample = conv_params.setdefault("subsample", (1, 1, 1))
-    init = conv_params.setdefault("init", "he_normal")
-    border_mode = conv_params.setdefault("border_mode", "same")
-    W_regularizer = conv_params.setdefault("W_regularizer", l2(1.e-4))
+    nb_filter = conv_params["filters"]
+    kernel_size = conv_params["kernel_size"]
+    strides = conv_params.setdefault("strides", (1, 1, 1))
+    kernel_initializer = conv_params.setdefault("kernel_initializer",
+                                                "he_normal")
+    padding = conv_params.setdefault("padding", "same")
+    kernel_regularizer = conv_params.setdefault("kernel_regularizer",
+                                                l2(1.e-4))
 
     def f(input):
         activation = _bn_relu(input)
-        return Convolution3D(nb_filter=nb_filter, kernel_dim1=kernel_dim1,
-                             kernel_dim2=kernel_dim2, kernel_dim3=kernel_dim3,
-                             subsample=subsample, init=init,
-                             border_mode=border_mode,
-                             W_regularizer=W_regularizer)(activation)
+        return Conv3D(filters=nb_filter, kernel_size=kernel_size,
+                      strides=strides, kernel_initializer=kernel_initializer,
+                      padding=padding,
+                      kernel_regularizer=kernel_regularizer)(activation)
     return f
 
 
@@ -87,26 +85,25 @@ def _shortcut3d(input, residual):
     shortcut = input
     if stride_dim1 > 1 or stride_dim2 > 1 or stride_dim3 > 1 \
             or not equal_channels:
-        shortcut = Convolution3D(
-            nb_filter=residual._keras_shape[CHANNEL_AXIS],
-            kernel_dim1=1, kernel_dim2=1, kernel_dim3=1,
-            subsample=(stride_dim1, stride_dim2, stride_dim3),
-            init="he_normal", border_mode="valid",
-            W_regularizer=l2(1e-4)
+        shortcut = Conv3D(
+            filters=residual._keras_shape[CHANNEL_AXIS],
+            kernel_size=(1, 1, 1),
+            strides=(stride_dim1, stride_dim2, stride_dim3),
+            kernel_initializer="he_normal", padding="valid",
+            kernel_regularizer=l2(1e-4)
             )(input)
+    return add([shortcut, residual])
 
-    return merge([shortcut, residual], mode="sum")
 
-
-def _residual_block3d(block_function, nb_filter, repetitions,
+def _residual_block3d(block_function, filters, repetitions,
                       is_first_layer=False):
     def f(input):
         for i in range(repetitions):
-            init_subsample = (1, 1, 1)
+            strides = (1, 1, 1)
             if i == 0 and not is_first_layer:
-                init_subsample = (2, 2, 2)
-            input = block_function(nb_filter=nb_filter,
-                                   init_subsample=init_subsample,
+                strides = (2, 2, 2)
+            input = block_function(filters=filters,
+                                   strides=strides,
                                    is_first_block_of_first_layer=(
                                        is_first_layer and i == 0)
                                    )(input)
@@ -115,7 +112,7 @@ def _residual_block3d(block_function, nb_filter, repetitions,
     return f
 
 
-def basic_block(nb_filter, init_subsample=(1, 1, 1),
+def basic_block(filters, strides=(1, 1, 1),
                 is_first_block_of_first_layer=False):
     """Basic 3 X 3 X 3 convolution blocks for use on resnets with layers <= 34.
     Follows improved proposed scheme in http://arxiv.org/pdf/1603.05027v2.pdf
@@ -123,21 +120,17 @@ def basic_block(nb_filter, init_subsample=(1, 1, 1),
     def f(input):
         if is_first_block_of_first_layer:
             # don't repeat bn->relu since we just did bn->relu->maxpool
-            conv1 = Convolution3D(nb_filter=nb_filter,
-                                  kernel_dim1=3, kernel_dim2=3, kernel_dim3=3,
-                                  subsample=init_subsample,
-                                  init="he_normal", border_mode="same",
-                                  W_regularizer=l2(1e-4)
-                                  )(input)
+            conv1 = Conv3D(filters=filters, kernel_size=(3, 3, 3),
+                           strides=strides, kernel_initializer="he_normal",
+                           padding="same", kernel_regularizer=l2(1e-4)
+                           )(input)
         else:
-            conv1 = _bn_relu_conv3d(nb_filter=nb_filter,
-                                    kernel_dim1=3, kernel_dim2=3,
-                                    kernel_dim3=3,
-                                    subsample=init_subsample
+            conv1 = _bn_relu_conv3d(filters=filters,
+                                    kernel_size=(3, 3, 3),
+                                    strides=strides
                                     )(input)
 
-        residual = _bn_relu_conv3d(nb_filter=nb_filter,
-                                   kernel_dim1=3, kernel_dim2=3, kernel_dim3=3,
+        residual = _bn_relu_conv3d(filters=filters, kernel_size=(3, 3, 3),
                                    )(conv1)
         return _shortcut3d(input, residual)
 
@@ -177,7 +170,7 @@ class Resnet3DBuilder(object):
         # Arguments
             input_shape: Tuple of input shape in the format
             (conv_dim1, conv_dim2, conv_dim3, channels) if dim_ordering='tf'
-            (nb_filter, conv_dim1, conv_dim2, conv_dim3) if dim_ordering='th'
+            (filter, conv_dim1, conv_dim2, conv_dim3) if dim_ordering='th'
             num_outputs: The number of outputs at the final softmax layer
             block_fn: Unit block to use {'basic_block', 'bottlenack_block'}
             repetitions: Repetitions of unit blocks
@@ -197,26 +190,22 @@ class Resnet3DBuilder(object):
         block_fn = _get_block(block_fn)
         input = Input(shape=input_shape)
         # first conv
-        conv1 = _conv_bn_relu3D(nb_filter=64, kernel_dim1=7, kernel_dim2=7,
-                                kernel_dim3=7, subsample=(2, 2, 2)
-                                )(input)
+        conv1 = _conv_bn_relu3D(filters=64, kernel_size=(7, 7, 7),
+                                strides=(2, 2, 2))(input)
         pool1 = MaxPooling3D(pool_size=(3, 3, 3), strides=(2, 2, 2),
-                             border_mode="same")(conv1)
+                             padding="same")(conv1)
 
         # repeat blocks
         block = pool1
         nb_filter = 64
         for i, r in enumerate(repetitions):
-            block = _residual_block3d(block_fn, nb_filter=nb_filter,
+            block = _residual_block3d(block_fn, filters=nb_filter,
                                       repetitions=r, is_first_layer=(i == 0)
                                       )(block)
             nb_filter *= 2
 
         # last activation
-        block = _bn_relu(block)
-        block_norm = BatchNormalization(mode=0, axis=CHANNEL_AXIS)(block)
-        block_output = Activation("relu")(block_norm)
-
+        block_output = _bn_relu(block)
 
         # average poll and classification
         pool2 = AveragePooling3D(pool_size=(block._keras_shape[DIM1_AXIS],
@@ -225,13 +214,17 @@ class Resnet3DBuilder(object):
                                  strides=(1, 1, 1))(block_output)
         flatten1 = Flatten()(pool2)
         if num_outputs > 1:
-            dense = Dense(output_dim=num_outputs, init="he_normal",
-                          activation="softmax", W_regularizer=l2(1e-2))(flatten1)
+            dense = Dense(units=num_outputs,
+                          kernel_initializer="he_normal",
+                          activation="softmax",
+                          kernel_regularizer=l2(1e-2))(flatten1)
         else:
-            dense = Dense(output_dim=num_outputs, init="he_normal",
-                          activation="sigmoid", W_regularizer=l2(1e-2))(flatten1)
+            dense = Dense(units=num_outputs,
+                          kernel_initializer="he_normal",
+                          activation="sigmoid",
+                          kernel_regularizer=l2(1e-2))(flatten1)
 
-        model = Model(input=input, output=dense)
+        model = Model(inputs=input, outputs=dense)
         return model
 
     @staticmethod

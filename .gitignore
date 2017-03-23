@@ -89,8 +89,10 @@ ENV/
 .ropeproject
 
 # volume images
+data/
 *.dcm
 *.nii.gz
 *.npy
-*data-science-bowl*
-*dicm2nii*
+
+# output
+output/*

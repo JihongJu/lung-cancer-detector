@@ -1,10 +1,10 @@
+"""Volume Image generator."""
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import os
 import abc
 import scipy
 import numpy as np
-import pandas as pd
 import keras.backend as K
 from keras.utils.np_utils import to_categorical
 from keras.preprocessing.image import Iterator
@@ -13,49 +13,43 @@ from imblearn.under_sampling import RandomUnderSampler
 
 
 class VolumeImageDataGenerator(object):
+    """Volume image data generator
+    # Arguments
+        image_shape: 3D/4D image shape tuple in the format of
+            (dim1, dim2, dim3) for single-channel images,
+            (dim1, dim2, dim3, channel) for multi-channel images
+            with tensorflow backend
+            or (channel, dim1, dim2, dim3) with theano backend.
+        image_resample: True if samplewise resampling
+            (subsampling and/or interpolation) is required
+            to achieve the target_shape, and False otherwise
+        samplewise_center:
+        samplewise_std_normalization:
+        voxelwise_center: substract the voxel mean of the whole dataset
+        voxel_mean: dataset_mean (e.g. 0.25 for LUNA2016)
+        voxelwise_normalization: scaled by voxel_bounds
+        voxel_bounds: tuple of voxel bounds (min_bound, max_bound)
+        imlearn_resampler: resampler for imbalanced dataset {None, 'rus'}
+        data_augmentation: {True, False, None}
+        dim_ordering: Keras image_dim_ordering {'tf', 'th', 'default'}
+    """
 
     def __init__(self,
-                 image_shape=None,
-                 target_shape=None,
-                 samplewise_resample=None,
-                 pixelwise_center=None,
-                 pixel_mean=None,
-                 pixelwise_normalization=None,
-                 pixel_bounds=None,
+                 image_shape,
+                 image_resample=None,
+                 voxelwise_center=None,
+                 voxel_mean=None,
+                 voxelwise_std_normalization=None,
+                 voxelwise_std=None,
+                 voxelwise_normalization=None,
+                 voxel_bounds=None,
                  samplewise_center=None,
                  samplewise_std_normalization=None,
                  imlearn_resampler=None,
                  preprocessing_function=None,
                  data_augmentation=None,
                  dim_ordering='default'):
-        """
-        # Arguments
-            image_shape: 3D/4D image shape tuple in the format of
-                (dim1, dim2, dim3) for single-channel images,
-                (dim1, dim2, dim3, channel) for multi-channel images
-                with tensorflow backend
-                or (channel, dim1, dim2, dim3) with theano backend.
-                It will be overwritten by target_shape when input images
-                are of different sizes.
-            target_shape: 3D/4D target size for the variant shape images.
-                (dim1, dim2, dim3) for single-channel images,
-                (dim1, dim2, dim3, channel) for multi-channel images
-                with tensorflow backend
-                or (channel, dim1, dim2, dim3) with theano backend.
-                It will overwrite image_shape if target_shape is set.
-            samplewise_resample: True if samplewise resampling
-                (subsampling and/or interpolation) is required
-                to achieve the target_shape, and False otherwise
-            samplewise_center:
-            samplewise_std_normalization:
-            pixelwise_center: substract the pixel mean of the whole dataset
-            pixel_mean: dataset_mean (e.g. 0.25 for LUNA2016)
-            pixelwise_normalization: scaled by pixel_bounds
-            pixel_bounds: tuple of pixel bounds (min_bound, max_bound)
-            imlearn_resampler: resampler for imbalanced dataset {None, 'rus'}
-            data_augmentation: {True, False, None}
-            dim_ordering: Keras image_dim_ordering {'tf', 'th', 'default'}
-        """
+
         # image_dim_ordering
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
@@ -76,42 +70,28 @@ class VolumeImageDataGenerator(object):
             self.dim3_axis = 3
         self.dim_ordering = dim_ordering
 
-        # image_shape
-        if image_shape and len(image_shape) not in {3, 4}:
+        # fixed image_shape
+        if len(image_shape) not in {3, 4}:
             raise ValueError('image_shape needs to be 3 dimensions for '
                              'single-channel volume image data, or 4 '
                              'dimensions for multi-channel data. '
                              'Got {} dimensions'.format(
                                  len(image_shape)))
-        if image_shape and len(image_shape) == 3:
+        if len(image_shape) == 3:
             if self.dim_ordering == 'tf':
                 self.image_shape = tuple(image_shape) + (1,)
             else:
                 self.image_shape = (1,) + tuple(image_shape)
-        elif image_shape and len(image_shape) == 4:
+        elif len(image_shape) == 4:
             self.image_shape = self.image_shape
-        # target_shape
-        if target_shape and len(target_shape) not in {3, 4}:
-            raise ValueError('target_shape needs to be 3 dimensions for '
-                             'single-channel volume image data, or 4 '
-                             'dimensions for multi-channel data. '
-                             'Got {} dimensions'.format(
-                                 len(target_shape)))
-        if target_shape and len(target_shape) == 3:
-            if self.dim_ordering == 'tf':
-                self.target_shape = tuple(target_shape) + (1,)
-            else:
-                self.target_shape = (1,) + tuple(target_shape)
-            self.image_shape = self.target_shape
-        elif target_shape and len(target_shape) == 4:
-            self.target_shape = self.target_shape
-            self.image_shape = self.target_shape
-        self.samplewise_resample = samplewise_resample
 
-        self.pixelwise_center = pixelwise_center
-        self.pixel_mean = pixel_mean
-        self.pixelwise_normalization = pixelwise_normalization
-        self.pixel_bounds = pixel_bounds
+        self.image_resample = image_resample
+        self.voxelwise_center = voxelwise_center
+        self.voxel_mean = voxel_mean
+        self.voxelwise_std_normalization = voxelwise_std_normalization
+        self.voxelwise_std = voxelwise_std
+        self.voxelwise_normalization = voxelwise_normalization
+        self.voxel_bounds = voxel_bounds
         self.samplewise_center = samplewise_center
         self.samplewise_std_normalization = samplewise_std_normalization
 
@@ -137,19 +117,21 @@ class VolumeImageDataGenerator(object):
     def standardize(self, x):
         """standardize inputs including featurewise/samplewise
         center/normalization, etc."""
+        if not self.image_resample:
+            x = to_shape(x, self.image_shape, constant_values=-1024)
+        elif self.image_resample:
+            x = resample(x, self.image_shape)
+
         if self.preprocessing_function:
             x = self.preprocessing_function(x)
-        if self.pixelwise_normalization:
-            if self.pixel_bounds is not None:
-                x = pixelwise_normalize(x, self.pixel_bounds)
-        if self.pixelwise_center:
-            if self.pixel_mean is not None:
-                x -= self.pixel_mean
-        if self.target_shape and not self.samplewise_resample:
-            x = to_shape(x, self.target_shape,
-                    constant_values=-1024)
-        elif self.target_shape and self.samplewise_resample:
-            x = samplewise_resample(x, self.target_shape)
+        if self.voxelwise_normalization:
+            if self.voxel_bounds is not None:
+                x = voxelwise_normalize(x, self.voxel_bounds)
+        if self.voxelwise_center:
+            if self.voxel_mean is not None:
+                x -= self.voxel_mean
+        if self.voxelwise_std_normalization:
+            x /= (self.voxelwise_std + 1e-7)
         if self.samplewise_center:
             x -= np.mean(x, axis=self.channel_axis, keepdims=True)
         if self.samplewise_std_normalization:
@@ -157,8 +139,16 @@ class VolumeImageDataGenerator(object):
         return x
 
     def random_transform(self, x):
-        """random transforms including flipping"""
+        """Random transforms including flipping."""
         pass
+
+    def standardize_dense_labels(self, y):
+        """Standardize dense labels."""
+        if self.image_shape and not self.image_resample:
+            y = to_shape(y, self.image_shape, constant_values=0)
+        elif self.image_shape and self.image_resample:
+            y = resample(y, self.image_shape, mode='nearest')
+        return y
 
 
 class VolumeImageLoaderIterator(Iterator):
@@ -181,11 +171,15 @@ class VolumeImageLoaderIterator(Iterator):
         if imlearn_resampler:
             self.patients_imbalanced = self.patients.copy()
             self.classes_imbalanced = self.classes.copy()
-	if imlearn_resampler == 'rus':
+
+        if imlearn_resampler == 'rus':
             self.resampler = RandomUnderSampler()
 
-        super(VolumeImageLoaderIterator, self).__init__(self.nb_sample, batch_size,
-                                                   shuffle, seed)
+        super(VolumeImageLoaderIterator, self).__init__(self.nb_sample,
+                                                        batch_size,
+                                                        shuffle,
+                                                        seed)
+
     def reset(self):
         # ensure self.batch_index is 0
         self.batch_index = 0
@@ -206,20 +200,28 @@ class VolumeImageLoaderIterator(Iterator):
             # standardize goes here
             x = self.volume_image_data_generator.standardize(x)
             batch_x[i] = x
+
         # build batch of labels
         if self.class_mode == 'sparse':
             batch_y = self.classes[index_array]
         elif self.class_mode == 'binary':
             batch_y = self.classes[index_array].astype(K.floatx())
         elif self.class_mode == 'categorical':
-            batch_y = to_categorical(self.classes[index_array], self.nb_classes)
+            batch_y = to_categorical(self.classes[index_array],
+                                     self.nb_classes)
         elif self.class_mode == 'segmentation':
-            batch_x = np.zeros((current_batch_size,) + self.image_shape,
-                           dtype=np.int16)
+            label_shape = list(self.image_shape)
+            label_shape[self.volume_image_data_generator.channel_axis - 1] \
+                = self.nb_classes
+            label_shape = tuple(label_shape)
+            batch_y = np.zeros((current_batch_size,) + label_shape,
+                               dtype=np.int8)
             for i, j in enumerate(index_array):
                 patient = self.classes[j]
-                y = self.volume_image_data_loader.load_labels(patient)
-                y = self.volume_image_data_generator.standardize(y)
+                y = self.volume_image_data_loader.load_label(patient)
+                y = self.volume_image_data_generator\
+                        .standardize_dense_labels(y)
+                y = to_categorical(y, self.nb_classes).reshape(label_shape)
                 batch_y[i] = y
 
         return batch_x, batch_y
@@ -231,8 +233,8 @@ class VolumeImageDataLoader(object):
         image_dir: directory of volume images
         label_dir: directory
     """
-    def __init__(self, image_dir, label_dir, image_format='npy',
-                 split='train', test_size=0.2, random_state=42,
+    def __init__(self, image_dir, label_dir=None, image_format='npy',
+                 split='train', test_size=None, random_state=42,
                  dim_ordering='default',
                  save_to_dir=None, save_prefix='', save_format='dcm'):
 
@@ -241,7 +243,7 @@ class VolumeImageDataLoader(object):
                           'valid directory.'.format(image_dir))
         self.image_dir = image_dir
 
-        if not os.path.exists(label_dir):
+        if label_dir and not os.path.exists(label_dir):
             raise IOError('Directory {} does not exist. Please provide a '
                           'valid directory.'.format(label_dir))
         self.label_dir = label_dir
@@ -253,12 +255,13 @@ class VolumeImageDataLoader(object):
         self.split = split
         self.test_size = test_size
 
-        self.patients = self.load_patients()
-        self.classes = self.load_classes()
-        if not len(self.patients) == len(self.classes):
+        self.patients, self.classes = self.get_patients_classes()
+        if not len(self.patients) == len(self.classes) \
+                and not self.split == 'test':
             raise ValueError('Number of patients needs to match number of '
-                    'classes. Got {} vs. {}'.format(len(self.patients),
-                                                    len(self.classes)))
+                             'classes. Got {} vs. {}'.format(
+                                 len(self.patients),
+                                 len(self.classes)))
 
         self.image_format = image_format
         white_list_formats = {'dcm', 'nii', 'npy', 'h5', 'mha'}
@@ -275,35 +278,38 @@ class VolumeImageDataLoader(object):
             self.dim_ordering = K.image_dim_ordering()
 
         # split train test or keep all
-        patients_train, patients_test, classes_train, classes_test \
-            = train_test_split(self.patients, self.classes,
-                               test_size=test_size, random_state=random_state)
-        if self.split == 'train':
-            self.patients = patients_train
-            self.classes = classes_train
-        elif self.split == 'val':
-            self.patients = patients_test
-            self.classes = classes_test
-        else:
-            pass
+        if test_size:
+            patients_train, patients_test, classes_train, classes_test \
+                = train_test_split(self.patients, self.classes,
+                                   test_size=test_size,
+                                   random_state=random_state)
+            if self.split == 'train':
+                self.patients = patients_train
+                self.classes = classes_train
+            elif self.split == 'val':
+                self.patients = patients_test
+                self.classes = classes_test
 
         self.save_to_dir = save_to_dir
         self.save_prefix = save_prefix
         self.save_format = save_format
 
     @abc.abstractmethod
-    def load_patients(self):
+    def get_patients_classes(self):
+        """Get patients and classes altogethre (Abstract)."""
+        patients = self.get_patients()
+        classes = self.get_classes()
+        return patients, classes
+
+    @abc.abstractmethod
+    def get_patients(self):
         """Image patients loading method. (Abstract)
         (the following is an example)
         """
-        try:
-            df_labels = pd.read_csv(self.label_dir)
-        except IOError:
-            raise
-        return df_labels['id'].values
+        return
 
     @abc.abstractmethod
-    def load_classes(self):
+    def get_classes(self):
         """Image classes, labels or label pointers loading method (Abstract)
         where
             classes: image class (binary, categorical or sparse)
@@ -312,89 +318,47 @@ class VolumeImageDataLoader(object):
         # Returns
             classes: vector of classes/labels/pointers
         """
-        try:
-            df_labels = pd.read_csv(self.label_dir)
-        except IOError:
-            raise
-        return df_labels['cancer'].values.astype('int')
+        return
 
     @abc.abstractmethod
     def load(self, p):
-        """Image series loading method given a filename (Abstract)
+        """Image series loading method given a filename (Abstract).
         # Arguments
             p: patient id
         # Returns
             arr: 4D numpy array of shape self.image_shape
         """
-        img_path = os.path.join(self.image_dir,
-                                '{}.{}'.format(p, self.image_format))
-        img = np.load(img_path)
-        arr = img_to_array(img, self.dim_ordering)
-
-        return arr
+        return
 
     @abc.abstractmethod
     def save(self, arr):
-        pass
+        return
 
     @abc.abstractmethod
-    def load_labels(self, pr):
-        """Dense labels loading methods given pointers to them (Abstract)
+    def load_label(self, pr):
+        """Dense labels loading methods given pointers to them (Abstract).
         # Arguments
             p: pointers to the dense labels
         # Returns
             arr: 4D array of dense labels
         """
-        pass
+        return
 
 
-def pixelwise_normalize(image, pixel_bounds):
-    if len(pixel_bounds) != 2:
-        raise ValueError("Expected tuple of pixel bounds "
-                         "(min_bound, max_bound). Got {}".format(pixel_bounds))
-    min_bound = pixel_bounds[0]
-    max_bound = pixel_bounds[1]
+def voxelwise_normalize(image, voxel_bounds):
+    if len(voxel_bounds) != 2:
+        raise ValueError("Expected tuple of voxel bounds "
+                         "(min_bound, max_bound). Got {}".format(voxel_bounds))
+    min_bound = voxel_bounds[0]
+    max_bound = voxel_bounds[1]
     image = (image - min_bound) / (max_bound - min_bound)
     image[image > 1] = 1.
     image[image < 0] = 0.
     return image
 
 
-def img_to_array(img, dim_ordering='default'):
-    """Converts VolumeImg to arr
-        # Arguments
-        img: VolumeImg instance.
-        dim_ordering: Image data format.
-    # Returns
-        A 4D Numpy array.
-    """
-    if dim_ordering == 'default':
-        dim_ordering = K.image_dim_ordering()
-    if dim_ordering not in {'th', 'tf'}:
-        raise ValueError('Unknown dim_ordering: ', dim_ordering)
-    # Numpy array x has format (dim1, dim2, dim3, channel)
-    # or (channel, dim1, dim2, dim3)
-    # nipy image has format (I don't know)
-    if isinstance(img, np.ndarray):
-        x = img.astype(K.floatx())
-    else:
-        x = img.get_data().astype(K.floatx())
-    if len(x.shape) == 4:
-        if dim_ordering == 'th':
-            x = x.transpose(3, 0, 1, 2)
-    elif len(x.shape) == 3:
-        if dim_ordering == 'th':
-            x = x[np.newaxis, ...]
-        else:
-            x = x[..., np.newaxis]
-    else:
-        raise ValueError('Unsupported image shape: ', x.shape)
-    return x
-
-
 def to_shape(arr, target_shape,  constant_values=0):
-    """Pad and/or crop arrays to the target_shape
-    """
+    """Pad and/or crop arrays to the target_shape."""
     # pad
     padded = pad(arr, target_shape)
     # crop
@@ -405,16 +369,17 @@ def to_shape(arr, target_shape,  constant_values=0):
     return cropped
 
 
-def samplewise_resample(self, image, target_shape, mode='nearest'):
+def resample(self, image, target_shape, mode='nearest'):
     """Resample the image to target_shape
     """
     resize_factor = image.shape / np.array(target_shape)
     resampled = scipy.ndimage.interpolation.zoom(image, resize_factor,
-                                             mode=mode)
+                                                 mode=mode)
     return resampled
 
 
 def pad(arr, target_shape, constant_values=0):
+    """Pad image to target shape."""
     arr_shape = arr.shape
     npad = ()
     for dim in range(len(arr_shape)):
@@ -426,13 +391,13 @@ def pad(arr, target_shape, constant_values=0):
             before = 0
             after = 0
         npad += ((before, after),)
-    padded = np.pad(arr, pad_width=npad,
-                     mode='constant',
-                     constant_values=constant_values)
+    padded = np.pad(arr, pad_width=npad, mode='constant',
+                    constant_values=constant_values)
     return padded
 
 
 def crop(arr, target_shape):
+    """Crop image to targe shape."""
     arr_shape = arr.shape
     ncrop = ()
     for dim in range(len(arr_shape)):
@@ -445,4 +410,3 @@ def crop(arr, target_shape):
             ncrop += np.index_exp[:]
     cropped = arr[ncrop]
     return cropped
-
