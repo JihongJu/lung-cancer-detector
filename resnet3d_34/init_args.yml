@@ -7,9 +7,9 @@ volume_image_data_generator:
             - -1000
             - 400
         image_shape:
-            - 16
-            - 16
-            - 16
+            - 96
+            - 96
+            - 96
         image_resample: False
         data_augmentation: True
     test:
@@ -20,9 +20,9 @@ volume_image_data_generator:
             - -1000
             - 400
         image_shape:
-            - 16
-            - 16
-            - 16
+            - 96
+            - 96
+            - 96
         image_resample: False
         data_augmentation: False
     flow_from_loader:
@@ -67,7 +67,7 @@ model:
             - "accuracy"
     fit_generator:
         steps_per_epoch: 1116
-        epochs: 100
+        epochs: 30
         validation_steps: 280
         verbose: 1
         max_q_size: 100

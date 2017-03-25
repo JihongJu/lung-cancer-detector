@@ -90,7 +90,7 @@ def _shortcut3d(input, residual):
             kernel_size=(1, 1, 1),
             strides=(stride_dim1, stride_dim2, stride_dim3),
             kernel_initializer="he_normal", padding="valid",
-            kernel_regularizer=l2(1e-4)
+            kernel_regularizer=l2(5e-4)
             )(input)
     return add([shortcut, residual])
 
@@ -122,7 +122,7 @@ def basic_block(filters, strides=(1, 1, 1),
             # don't repeat bn->relu since we just did bn->relu->maxpool
             conv1 = Conv3D(filters=filters, kernel_size=(3, 3, 3),
                            strides=strides, kernel_initializer="he_normal",
-                           padding="same", kernel_regularizer=l2(1e-4)
+                           padding="same", kernel_regularizer=l2(5e-4)
                            )(input)
         else:
             conv1 = _bn_relu_conv3d(filters=filters,
@@ -217,12 +217,12 @@ class Resnet3DBuilder(object):
             dense = Dense(units=num_outputs,
                           kernel_initializer="he_normal",
                           activation="softmax",
-                          kernel_regularizer=l2(1e-2))(flatten1)
+                          kernel_regularizer=l2(5e-4))(flatten1)
         else:
             dense = Dense(units=num_outputs,
                           kernel_initializer="he_normal",
                           activation="sigmoid",
-                          kernel_regularizer=l2(1e-2))(flatten1)
+                          kernel_regularizer=l2(5e-4))(flatten1)
 
         model = Model(inputs=input, outputs=dense)
         return model
