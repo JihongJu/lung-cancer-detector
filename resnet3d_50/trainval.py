@@ -44,7 +44,7 @@ nb_classes = init_args['volume_image_data_generator'][
 
 
 checkpointer = ModelCheckpoint(
-    filepath="/tmp/resnet34_weights_{}.hdf5".format(title),
+    filepath="/tmp/resnet50_weights_{}.hdf5".format(title),
     verbose=1,
     save_best_only=True)
 lr_reducer = ReduceLROnPlateau(monitor='val_loss',
@@ -74,16 +74,16 @@ val_iter_args = iterator_args.copy()
 val_iter_args['volume_image_data_loader'] = val_vol_loader
 
 image_shape = train_datagen.image_shape
-model = Resnet3DBuilder.build_resnet_34(image_shape, nb_classes)
+model = Resnet3DBuilder.build_resnet_50(image_shape, nb_classes)
 compile_args = init_args['model']['compile']
-compile_args['optimizer'] = Adam(lr=1e-2)
+compile_args['optimizer'] = Adam(lr=1e-3)
 model.compile(**compile_args)
 
 model_fit_args = init_args['model']['fit_generator']
 model_fit_args['generator'] = train_datagen.flow_from_loader(**train_iter_args)
 model_fit_args['validation_data'] = test_datagen.flow_from_loader(
     **val_iter_args)
-model_fit_args['callbacks'] = [lr_reducer, early_stopper, csv_logger]
+model_fit_args['callbacks'] = [checkpointer, lr_reducer, early_stopper, csv_logger]
 
 model.fit_generator(**model_fit_args)
-model.save('output/resnet34_{}.h5'.format(title))
+model.save('output/resnet50_{}.h5'.format(title))

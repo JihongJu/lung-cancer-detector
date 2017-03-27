@@ -1,0 +1,73 @@
+volume_image_data_generator:
+    train:
+        voxelwise_center: True
+        voxel_mean: 0.25
+        voxelwise_normalization: True
+        voxel_bounds:
+            - -1000
+            - 400
+        image_shape:
+            - 96
+            - 96
+            - 96
+        image_resample: False
+        data_augmentation: True
+    test:
+        voxelwise_center: True
+        voxel_mean: 0.25
+        voxelwise_normalization: True
+        voxel_bounds:
+            - -1000
+            - 400
+        image_shape:
+            - 96
+            - 96
+            - 96
+        image_resample: False
+        data_augmentation: False
+    flow_from_loader:
+        class_mode: "binary"
+        nb_classes: 1
+        batch_size: 32
+        shuffle: True
+volume_image_data_loader:
+    train:
+        image_dir: "../data/data-science-bowl/npy/stage1"
+        label_dir: "../data/data-science-bowl/stage1_labels.csv"
+        image_format: "npy"
+        split: "train"
+        test_size: 0.2
+        random_state: 42
+    val:
+        image_dir: "../data/data-science-bowl/npy/stage1"
+        label_dir: "../data/data-science-bowl/stage1_labels.csv"
+        image_format: "npy"
+        split: "val"
+        test_size: 0.2
+        random_state: 42
+    trainval:
+        image_dir: "../data/data-science-bowl/npy/stage1"
+        label_dir: "../data/data-science-bowl/stage1_labels.csv"
+        image_format: "npy"
+        split: "trainval"
+        test_size: 0.
+        random_state: 42
+    test:
+        image_dir: "../data/data-science-bowl/npy/stage1"
+        label_dir: "../data/data-science-bowl/stage1_sample_submissions.csv"
+        image_format: "npy"
+        split: "test"
+        test_size: 1.
+        random_state: 42
+model:
+    compile:
+        loss: "binary_crossentropy"
+        optimizer: "adam"
+        metrics:
+            - "accuracy"
+    fit_generator:
+        steps_per_epoch: 1116
+        epochs: 30
+        validation_steps: 280
+        verbose: 1
+        max_q_size: 100

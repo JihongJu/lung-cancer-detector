@@ -1,3 +1,4 @@
+import time
 import pytest
 import numpy as np
 from preprocessing.volume_image import (
@@ -68,8 +69,11 @@ def test_data_generator(vol_data_gen, train_vol_loader, test_vol_loader):
             volume_image_data_loader=train_vol_loader,
             batch_size=32, shuffle=True, seed=42)
     for i in range(16):
+	start=time.time()
         batch_x, batch_y = train_generator.next()
         assert batch_x.shape == (32, 96, 96, 96, 1)
+	end=time.time()
+	print(i, end-start)
     print('Test')
     test_generator = vol_data_gen.flow_from_loader(
         volume_image_data_loader=test_vol_loader,
