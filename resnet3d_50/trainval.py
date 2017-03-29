@@ -44,7 +44,7 @@ nb_classes = init_args['volume_image_data_generator'][
 
 
 checkpointer = ModelCheckpoint(
-    filepath="/tmp/resnet50_weights_{}.hdf5".format(title),
+    filepath="output/checkpoints_resnet50_{}.h5".format(title),
     verbose=1,
     save_best_only=True)
 lr_reducer = ReduceLROnPlateau(monitor='val_loss',
@@ -53,7 +53,7 @@ lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                patience=5, min_lr=0.5e-6)
 early_stopper = EarlyStopping(monitor='val_loss',
                               min_delta=0.001,
-                              patience=10)
+                              patience=25)
 csv_logger = CSVLogger(
     'output/{}_{}.csv'.format(datetime.datetime.now().isoformat(), title))
 

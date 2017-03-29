@@ -28,7 +28,7 @@ volume_image_data_generator:
     flow_from_loader:
         class_mode: "binary"
         nb_classes: 1
-        batch_size: 32
+        batch_size: 16
         shuffle: True
 volume_image_data_loader:
     train:
@@ -66,8 +66,8 @@ model:
         metrics:
             - "accuracy"
     fit_generator:
-        steps_per_epoch: 34
+        steps_per_epoch: 87
         epochs: 100
-        validation_steps: 8
+        validation_steps: 12
         verbose: 1
         max_q_size: 100
