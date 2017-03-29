@@ -81,3 +81,4 @@ def test_data_generator(vol_data_gen, train_vol_loader, test_vol_loader):
     for i in range(4):
         batch_x, batch_y = test_generator.next()
         assert batch_x.shape == (32, 96, 96, 96, 1)
+
