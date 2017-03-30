@@ -234,7 +234,7 @@ class VolumeImageDataLoader(object):
         label_dir: directory
     """
     def __init__(self, image_dir, label_dir=None, image_format='npy',
-                 split='train', test_size=None, random_state=42,
+                 split='train', test_size=None, random_state=None,
                  dim_ordering='default',
                  save_to_dir=None, save_prefix='', save_format='dcm'):
 
