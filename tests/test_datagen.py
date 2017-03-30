@@ -33,7 +33,7 @@ def test_to_shape():
 @pytest.fixture
 def vol_data_gen():
     datagen = VolumeImageDataGenerator(
-        **init_args['volume_image_data_generator']['train'])
+        **init_args['volume_image_data_generator']['train']['init'])
     return datagen
 
 
@@ -51,17 +51,13 @@ def test_data_loader(train_vol_loader, test_vol_loader):
     assert train_vol_loader.split == "train"
     assert test_vol_loader.split == "val"
     patients1 = train_vol_loader.patients
-    assert len(patients1) \
-        == init_args['model']['fit_generator']['samples_per_epoch']
     patients2 = test_vol_loader.patients
-    assert len(patients2) \
-        == init_args['model']['fit_generator']['nb_val_samples']
     assert len(np.intersect1d(patients1, patients2)) == 0
 
 
 def test_data_generator(vol_data_gen, train_vol_loader, test_vol_loader):
     assert vol_data_gen.voxel_mean \
-        == init_args['volume_image_data_generator']['train']['voxel_mean']
+        == init_args['volume_image_data_generator']['train']['init']['voxel_mean']
     assert len(vol_data_gen.image_shape) == 4
     assert len(vol_data_gen.voxel_bounds) == 2
     print('Train')

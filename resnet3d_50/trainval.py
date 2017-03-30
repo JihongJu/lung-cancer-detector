@@ -53,7 +53,7 @@ lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                patience=10, min_lr=1e-6)
 early_stopper = EarlyStopping(monitor='val_loss',
                               min_delta=0.001,
-                              patience=30)
+                              patience=50)
 csv_logger = CSVLogger(
     'output/{}_{}.csv'.format(datetime.datetime.now().isoformat(), title))
 
