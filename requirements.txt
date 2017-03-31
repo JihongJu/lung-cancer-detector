@@ -8,3 +8,4 @@ h5py
 pydicom
 nipy
 imbalanced-learn
+git+https://github.com/JihongJu/keras-resnet3d.git

@@ -17,7 +17,7 @@ from preprocessing.volume_image import (
     VolumeImageDataGenerator)
 from preprocessing.image_loader import (
     NPYDataLoader)
-from models.resnet3d import Resnet3DBuilder
+from resnet3d import Resnet3DBuilder
 
 import yaml
 with open("init_args.yml", 'r') as stream:
@@ -73,7 +73,8 @@ val_iter_args = init_args['volume_image_data_generator']['val']['flow_from_loade
 val_iter_args['volume_image_data_loader'] = val_vol_loader
 
 image_shape = train_datagen.image_shape
-model = Resnet3DBuilder.build_resnet_50(image_shape, nb_classes)
+regularization_factor = 1e-2
+model = Resnet3DBuilder.build_resnet_50(image_shape, nb_classes, regularization_factor)
 compile_args = init_args['model']['compile']
 compile_args['optimizer'] = Adam(lr=1e-3)
 model.compile(**compile_args)
