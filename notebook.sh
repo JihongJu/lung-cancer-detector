@@ -1,3 +1,4 @@
-source venv/bin/activate
+cd ${HOME}/workspace
+source ${HOME}/workspace/venv/bin/activate
 python -m ipykernel install --user --name=venv
 jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser
