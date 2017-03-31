@@ -9,20 +9,17 @@ VOLUMES = -v `pwd`:/root/workspace \
 	-v ${HOME}/Datasets:/root/workspace/data
 ENV = -e KERAS_BACKEND=tensorflow
 
-.PHONY: build setup bash notebook test
-
-build:
-	$(DOCKER) build -t $(NS)/$(REPO):$(VERSION) .
+.PHONY: setup bash notebook test
 
 setup:
-	$(DOCKER) run --rm -it $(PORTS) $(VOLUMES) $(ENV) $(NS)/$(REPO):$(VERSION) /root/workspace/setup.sh
+	$(DOCKER) run --rm -it $(PORTS) $(VOLUMES) $(ENV) $(NS)/$(REPO):$(VERSION) /root/workspace/setup_env.sh
 
 bash:
 	$(DOCKER) run --rm -it $(PORTS) $(VOLUMES) $(ENV) $(NS)/$(REPO):$(VERSION) bash
 
 notebook: 
-	$(DOCKER) run --rm -it $(PORTS) $(VOLUMES) $(ENV) $(NS)/$(REPO):$(VERSION) /run_notebook.sh
+	$(DOCKER) run --rm -it $(PORTS) $(VOLUMES) $(ENV) $(NS)/$(REPO):$(VERSION) /root/workspace/run_notebook.sh
 
 test: 
-	$(DOCKER) run --rm -it $(PORTS) $(VOLUMES) $(ENV) $(NS)/$(REPO):$(VERSION) py.test tests
+	$(DOCKER) run --rm -it $(PORTS) $(VOLUMES) $(ENV) $(NS)/$(REPO):$(VERSION) /root/workspace/run_tests.sh
 
