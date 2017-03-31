@@ -53,14 +53,14 @@ lr_reducer = ReduceLROnPlateau(monitor='val_loss',
                                patience=10, min_lr=1e-6)
 early_stopper = EarlyStopping(monitor='val_loss',
                               min_delta=0.001,
-                              patience=30)
+                              patience=100)
 csv_logger = CSVLogger(
     'output/{}_{}.csv'.format(datetime.datetime.now().isoformat(), title))
 
 train_datagen = VolumeImageDataGenerator(
         **init_args['volume_image_data_generator']['train']['init'])
 val_datagen = VolumeImageDataGenerator(
-        **init_args['volume_image_data_generator']['test']['init'])
+        **init_args['volume_image_data_generator']['val']['init'])
 
 train_vol_loader = NPYDataLoader(
         **init_args['volume_image_data_loader']['train'])
@@ -69,7 +69,7 @@ val_vol_loader = NPYDataLoader(
 
 train_iter_args = init_args['volume_image_data_generator']['train']['flow_from_loader']
 train_iter_args['volume_image_data_loader'] = train_vol_loader
-val_iter_args = init_args['volume_image_data_generator']['train']['flow_from_loader']
+val_iter_args = init_args['volume_image_data_generator']['val']['flow_from_loader']
 val_iter_args['volume_image_data_loader'] = val_vol_loader
 
 image_shape = train_datagen.image_shape

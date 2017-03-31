@@ -35,8 +35,8 @@ volume_image_data_generator:
         flow_from_loader:
             class_mode: "binary"
             nb_classes: 1
-            batch_size: 16
-            shuffle: True
+            batch_size: 1
+            shuffle: False
     test:
         init:
             voxelwise_center: True
@@ -93,8 +93,8 @@ model:
             - "accuracy"
     fit_generator:
         steps_per_epoch: 70
-        epochs: 300
-        validation_steps: 17
+        epochs: 200
+        validation_steps: 279
         verbose: 1
         max_q_size: 100
     evaluate_generator:

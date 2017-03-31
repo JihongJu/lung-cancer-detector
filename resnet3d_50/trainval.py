@@ -60,7 +60,7 @@ csv_logger = CSVLogger(
 train_datagen = VolumeImageDataGenerator(
         **init_args['volume_image_data_generator']['train']['init'])
 val_datagen = VolumeImageDataGenerator(
-        **init_args['volume_image_data_generator']['test']['init'])
+        **init_args['volume_image_data_generator']['val']['init'])
 
 train_vol_loader = NPYDataLoader(
         **init_args['volume_image_data_loader']['train'])
@@ -69,7 +69,7 @@ val_vol_loader = NPYDataLoader(
 
 train_iter_args = init_args['volume_image_data_generator']['train']['flow_from_loader']
 train_iter_args['volume_image_data_loader'] = train_vol_loader
-val_iter_args = init_args['volume_image_data_generator']['train']['flow_from_loader']
+val_iter_args = init_args['volume_image_data_generator']['val']['flow_from_loader']
 val_iter_args['volume_image_data_loader'] = val_vol_loader
 
 image_shape = train_datagen.image_shape
