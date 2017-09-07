@@ -73,7 +73,7 @@ val_iter_args = init_args['volume_image_data_generator']['val']['flow_from_loade
 val_iter_args['volume_image_data_loader'] = val_vol_loader
 
 image_shape = train_datagen.image_shape
-regularization_factor = 2.5e-2
+regularization_factor = 5
 model = Resnet3DBuilder.build_resnet_18(image_shape, nb_classes, regularization_factor)
 compile_args = init_args['model']['compile']
 compile_args['optimizer'] = Adam(lr=1e-3)

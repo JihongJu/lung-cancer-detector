@@ -59,28 +59,28 @@ volume_image_data_generator:
 volume_image_data_loader:
     train:
         image_dir: "../data/DataScienceBowl2017/npy/stage1"
-        label_dir: "../data/DataScienceBowl2017/stage1_labels_full.csv"
+        label_dir: "../data/DataScienceBowl2017/stage1_labels.csv"
         image_format: "npy"
         split: "train"
         test_size: 0.2
         random_state: 42
     val:
         image_dir: "../data/DataScienceBowl2017/npy/stage1"
-        label_dir: "../data/DataScienceBowl2017/stage1_labels_full.csv"
+        label_dir: "../data/DataScienceBowl2017/stage1_labels.csv"
         image_format: "npy"
         split: "val"
         test_size: 0.2
         random_state: 42
     trainval:
         image_dir: "../data/DataScienceBowl2017/npy/stage1"
-        label_dir: "../data/DataScienceBowl2017/stage1_labels_full.csv"
+        label_dir: "../data/DataScienceBowl2017/stage1_labels.csv"
         image_format: "npy"
         split: "trainval"
         test_size: 0.
         random_state: 42
     test:
-        image_dir: "../data/DataScienceBowl2017/npy/stage2"
-        label_dir: "../data/DataScienceBowl2017/stage2_sample_submission.csv"
+        image_dir: "../data/DataScienceBowl2017/npy/stage1"
+        label_dir: "../data/DataScienceBowl2017/stage1_sample_submission.csv"
         image_format: "npy"
         split: "test"
         test_size: 0.
